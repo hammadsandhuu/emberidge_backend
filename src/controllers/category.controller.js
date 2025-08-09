@@ -1,0 +1,245 @@
+const Category = require("../models/category.model");
+const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/appError");
+const APIFeatures = require("../utils/apiFeatures");
+const { cloudinary } = require("../../config/cloudinary");
+
+// ========================
+// GET ALL CATEGORIES
+// ========================
+exports.getAllCategories = catchAsync(async (req, res, next) => {
+  const filter = {};
+  if (req.query.type) filter.type = req.query.type;
+
+  const queryStr = JSON.stringify(req.query).replace(
+    /\b(gte|gt|lte|lt)\b/g,
+    (match) => `$${match}`
+  );
+  const queryObj = JSON.parse(queryStr);
+
+  const features = new APIFeatures(
+    Category.find(filter).populate("createdBy", "name email"),
+    queryObj
+  )
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+
+  const categories = await features.query;
+
+  res.status(200).json({
+    status: "success",
+    results: categories.length,
+    data: { categories },
+  });
+});
+
+// ========================
+// GET SINGLE CATEGORY
+// ========================
+exports.getCategory = catchAsync(async (req, res, next) => {
+  const category = await Category.findOne({ slug: req.params.slug }).populate(
+    "createdBy",
+    "name email"
+  );
+
+  if (!category) {
+    return next(new AppError("No category found with that slug", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: { category },
+  });
+});
+
+// ========================
+// CREATE CATEGORY
+// ========================
+exports.createCategory = catchAsync(async (req, res, next) => {
+  if (req.file) {
+    req.body.image = {
+      id: req.file.filename, // Cloudinary public ID
+      thumbnail: req.file.path, // Cloudinary secure URL
+    };
+  }
+
+  req.body.createdBy = req.user.id;
+
+  const newCategory = await Category.create(req.body);
+
+  res.status(201).json({
+    status: "success",
+    data: { category: newCategory },
+  });
+});
+
+// ========================
+// UPDATE CATEGORY
+// ========================
+exports.updateCategory = catchAsync(async (req, res, next) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) {
+    return next(new AppError("No category found with that ID", 404));
+  }
+
+  if (req.file) {
+    // Delete old image if exists
+    if (category.image && category.image.id) {
+      await cloudinary.uploader.destroy(category.image.id);
+    }
+    req.body.image = {
+      id: req.file.filename,
+      thumbnail: req.file.path,
+    };
+  }
+
+  const updatedCategory = await Category.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
+
+  res.status(200).json({
+    status: "success",
+    data: { category: updatedCategory },
+  });
+});
+
+// ========================
+// DELETE CATEGORY
+// ========================
+exports.deleteCategory = catchAsync(async (req, res, next) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) {
+    return next(new AppError("No category found with that ID", 404));
+  }
+
+  if (category.image && category.image.id) {
+    await cloudinary.uploader.destroy(category.image.id);
+  }
+
+  await Category.findByIdAndDelete(req.params.id);
+
+  res.status(204).json({
+    status: "success",
+    data: null,
+  });
+});
+
+// ========================
+// ADD CHILD CATEGORY
+// ========================
+exports.addChildCategory = catchAsync(async (req, res, next) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) {
+    return next(new AppError("No category found with that ID", 404));
+  }
+
+  if (
+    req.user.role !== "admin" ||
+    category.createdBy.toString() !== req.user.id
+  ) {
+    return next(
+      new AppError("You do not have permission to modify this category", 403)
+    );
+  }
+
+  if (req.file) {
+    req.body.image = {
+      id: req.file.filename,
+      thumbnail: req.file.path,
+    };
+  }
+
+  category.children.push(req.body);
+  await category.save();
+
+  res.status(200).json({
+    status: "success",
+    data: { category },
+  });
+});
+
+// ========================
+// UPDATE CHILD CATEGORY
+// ========================
+exports.updateChildCategory = catchAsync(async (req, res, next) => {
+  const { id, childId } = req.params;
+
+  const category = await Category.findById(id);
+  if (!category) {
+    return next(new AppError("No category found with that ID", 404));
+  }
+
+  if (
+    req.user.role !== "admin" ||
+    category.createdBy.toString() !== req.user.id
+  ) {
+    return next(
+      new AppError("You do not have permission to modify this category", 403)
+    );
+  }
+
+  const childCategory = category.children.id(childId);
+  if (!childCategory) {
+    return next(new AppError("No child category found with that ID", 404));
+  }
+
+  if (req.file) {
+    if (childCategory.image && childCategory.image.id) {
+      await cloudinary.uploader.destroy(childCategory.image.id);
+    }
+    req.body.image = {
+      id: req.file.filename,
+      thumbnail: req.file.path,
+    };
+  }
+
+  childCategory.set(req.body);
+  await category.save();
+
+  res.status(200).json({
+    status: "success",
+    data: { category },
+  });
+});
+
+// ========================
+// DELETE CHILD CATEGORY
+// ========================
+exports.deleteChildCategory = catchAsync(async (req, res, next) => {
+  const { id, childId } = req.params;
+
+  const category = await Category.findById(id);
+  if (!category) {
+    return next(new AppError("No category found with that ID", 404));
+  }
+
+  if (
+    req.user.role !== "admin" ||
+    category.createdBy.toString() !== req.user.id
+  ) {
+    return next(
+      new AppError("You do not have permission to modify this category", 403)
+    );
+  }
+
+  const childCategory = category.children.id(childId);
+  if (!childCategory) {
+    return next(new AppError("No child category found with that ID", 404));
+  }
+
+  if (childCategory.image && childCategory.image.id) {
+    await cloudinary.uploader.destroy(childCategory.image.id);
+  }
+
+  category.children.pull(childId);
+  await category.save();
+
+  res.status(204).json({
+    status: "success",
+    data: null,
+  });
+});
