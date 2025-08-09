@@ -4,8 +4,8 @@
   "description": "E-commerce backend API",
   "main": "src/server.js",
   "scripts": {
-    "start": "NODE_ENV=production node src/server.js",
-    "dev": "NODE_ENV=development nodemon src/server.js",
+    "start": "NODE_ENV=production node src/index.js",
+    "dev": "NODE_ENV=development nodemon src/index.js",
     "test": "NODE_ENV=test jest --watchAll --detectOpenHandles",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,jsx,json,md}\"",
