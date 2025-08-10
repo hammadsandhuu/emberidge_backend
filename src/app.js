@@ -13,25 +13,21 @@ const authRoutes = require("./routes/auth.routes");
 const categoryRoutes = require("./routes/category.routes");
 const productRoutes = require("./routes/product.routes");
 
-
-// Create express app
 const app = express();
 
-// 1) GLOBAL MIDDLEWARES
-
-// Implement CORS
+// CORS
 app.use(cors());
 app.options("*", cors());
 
-// Set security HTTP headers
+// Security
 app.use(helmet());
 
-// Development logging
+// Logging
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Limit requests from same API
+// Rate limiting
 const limiter = rateLimit({
   max: 100,
   windowMs: 60 * 60 * 1000,
@@ -39,18 +35,16 @@ const limiter = rateLimit({
 });
 app.use("/api", limiter);
 
-// Body parser, reading data from body into req.body
+// Body parser
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
-// Data sanitization against NoSQL query injection
+// Sanitization
 app.use(mongoSanitize());
-
-// Data sanitization against XSS
 app.use(xss());
 
-// Prevent parameter pollution
+// Parameter pollution prevention
 app.use(
   hpp({
     whitelist: [
@@ -64,23 +58,22 @@ app.use(
   })
 );
 
-// Compress responses
+// Compression
 app.use(compression());
 
-// 2) ROUTES
-app.get("/",(req,res)=>{
-  res.send("Hello world")
-})
+// Routes
+app.get("/", (req, res) => {
+  res.send("Hello world");
+});
 app.use("/auth", authRoutes);
 app.use("/api/v1", categoryRoutes);
 app.use("/api/v1", productRoutes);
 
-// Serve static files
+// Static files
 app.use(express.static(path.join(__dirname, "public")));
 
-// 3) ERROR HANDLING
-// Handle 404
-app.all("*", (req, res, next) => {
+// 404 handler
+app.all("*", (req, res) => {
   res.status(404).json({
     status: "fail",
     message: `Can't find ${req.originalUrl} on this server!`,
