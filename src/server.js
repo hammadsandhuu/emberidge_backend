@@ -6,13 +6,11 @@ const logger = require("./utils/logger");
 (async () => {
   try {
     await connectDB();
-
-    // Only run .listen() if NOT on Vercel
     if (process.env.VERCEL !== "1") {
       const PORT = process.env.PORT || 5000;
       app.listen(PORT, () => {
         logger.info(
-          `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
+          `Server running in ${process.env.NODE_ENV} mode on port http://localhost:${PORT}`
         );
       });
     }

@@ -19,9 +19,9 @@ const connectDB = async () => {
       .connect(process.env.MONGO_URI, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
-        bufferCommands: false, // Disable mongoose buffering
-        serverSelectionTimeoutMS: 5000, // Fail fast if no connection
-        socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
       })
       .then((mongoose) => {
         logger.info("MongoDB Connected");
