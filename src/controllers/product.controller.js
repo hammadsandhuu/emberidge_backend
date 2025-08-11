@@ -88,48 +88,42 @@ exports.getProduct = catchAsync(async (req, res, next) => {
 
 // CREATE PRODUCT
 exports.createProduct = catchAsync(async (req, res, next) => {
-  const { category: categoryId, subCategory: subCategoryId } = req.body;
+  const productData = JSON.parse(req.body.product); // from form-data
 
-  // Validate parent category
-  const category = await Category.findById(categoryId);
-  if (!category)
-    return next(new AppError("No category found with that ID", 404));
+  // Auto-generate slug only
+  productData.slug = slugify(productData.name, { lower: true });
 
-  // Validate subCategory belongs to category (controller-level double-check)
-  const childCategory = category.children.id(subCategoryId);
-  if (!childCategory)
-    return next(
-      new AppError("No sub-category found with that ID in this category", 404)
-    );
+  // Handle main image
+  if (req.files?.image?.[0]) {
+    const img = req.files.image[0];
+    productData.image = {
+      index: 1,
+      thumbnail: img.path,
+      original: img.path,
+    };
+  }
 
-  // Require main image
-  if (!req.files?.image?.[0]?.path)
-    return next(new AppError("A main product image is required", 400));
-
-  // Main image
-  req.body.image = {
-    id: req.files.image[0].filename,
-    original: req.files.image[0].path,
-    thumbnail: req.files.image[0].path,
-  };
-
-  // Gallery images (optional)
+  // Handle gallery images
   if (req.files?.gallery) {
-    req.body.gallery = req.files.gallery.map((file) => ({
-      id: file.filename,
-      original: file.path,
+    productData.gallery = req.files.gallery.map((file, index) => ({
+      index: index + 1,
       thumbnail: file.path,
+      original: file.path,
     }));
   }
 
-  // createdBy if you track it
-  if (req.user?.id) req.body.createdBy = req.user.id;
-
-  // slug will be created by pre('save') in model
-  const newProduct = await Product.create(req.body);
-
-  res.status(201).json({ status: "success", data: { product: newProduct } });
+  const product = await Product.create(productData);
+  res.status(201).json({ status: "success", data: { product } });
 });
+
+exports.getProducts = async (req, res, next) => {
+  try {
+    const products = await Product.find();
+    res.json(products);
+  } catch (err) {
+    next(err);
+  }
+};
 
 // UPDATE PRODUCT
 exports.updateProduct = catchAsync(async (req, res, next) => {
