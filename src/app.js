@@ -62,13 +62,14 @@ app.use(
 app.use(compression());
 
 // Routes
+
+app.use("/auth", authRoutes);
+app.use("/api/v1/categories", categoryRoutes);
+app.use("/api/v1/products", productRoutes);
+
 app.get("/", (req, res) => {
   res.send("Hello world");
 });
-app.use("/auth", authRoutes);
-app.use("/api/v1", categoryRoutes);
-app.use("/api/v1", productRoutes);
-
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
 

@@ -1,16 +1,18 @@
-// routes/product.routes.js (snippet)
+// routes/product.routes.js
 const express = require("express");
 const router = express.Router();
 const productController = require("../controllers/product.controller");
 const upload = require("../utils/multer");
 const { protect, restrictTo } = require("../middleware/authMiddleware");
 
-router.get("/products", productController.getAllProducts);
-router.get("product/:slug", productController.getProduct);
+// Public routes
+router.get("/", productController.getAllProducts);
+router.get("/:slug", productController.getProduct); // <-- fixed path (plural)
 
+// Admin-only routes
 router.use(protect, restrictTo("admin"));
 router.post(
-  "/product",
+  "",
   upload.fields([
     { name: "image", maxCount: 1 },
     { name: "gallery", maxCount: 5 },
