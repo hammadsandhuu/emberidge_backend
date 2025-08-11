@@ -7,12 +7,12 @@ const { protect, restrictTo } = require("../middleware/authMiddleware");
 
 // Public routes
 router.get("/", productController.getAllProducts);
-router.get("/:slug", productController.getProduct); // <-- fixed path (plural)
+router.get("/:slug", productController.getProduct);
 
 // Admin-only routes
 router.use(protect, restrictTo("admin"));
 router.post(
-  "",
+  "/",
   upload.fields([
     { name: "image", maxCount: 1 },
     { name: "gallery", maxCount: 5 },

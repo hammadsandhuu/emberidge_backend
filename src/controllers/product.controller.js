@@ -1,15 +1,16 @@
 // controllers/product.controller.js
-const Product = require("../models/product.model");
+const { Product, Tag } = require("../models/product.model");
 const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
 const slugify = require("slugify");
 const safeDestroy = require("../utils/safeDestroy");
+const { Attribute } = require("../models/product.model");
+const { Variation } = require("../models/product.model");
+const { VariationOption } = require("../models/product.model");
 
-
-
-// GET ALL PRODUCTS (same merged filters as before)
+// GET ALL PRODUCTS
 exports.getAllProducts = catchAsync(async (req, res, next) => {
   const filter = {};
   const andConditions = [];
@@ -41,7 +42,9 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   }
 
   if (req.query.tag) {
-    andConditions.push({ "tag.slug": req.query.tag });
+    const tag = await Tag.findOne({ slug: req.query.tag }).select("_id");
+    if (!tag) return next(new AppError("No tag found with that slug", 404));
+    andConditions.push({ tags: tag._id });
   }
 
   if (req.query.search) {
@@ -53,68 +56,217 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
 
   if (andConditions.length > 0) filter.$and = andConditions;
 
-  const features = new APIFeatures(
-    Product.find(filter).populate("category"),
-    req.query
-  )
+  // Build query with populate BEFORE execution
+  let query = Product.find(filter)
+    .populate("category tags")
+    .populate({
+      path: "variations",
+      populate: {
+        path: "attribute",
+        model: "Attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("variation_options");
+
+  // Apply APIFeatures on the query object
+  const features = new APIFeatures(query, req.query)
     .sort()
     .limitFields()
     .paginate();
+
   const products = await features.query;
 
-  res
-    .status(200)
-    .json({ status: "success", results: products.length, data: { products } });
+  res.status(200).json({
+    status: "success",
+    results: products.length,
+    data: { products },
+  });
 });
 
-// GET SINGLE PRODUCT BY SLUG
+// GET SINGLE PRODUCT
 exports.getProduct = catchAsync(async (req, res, next) => {
-  const product = await Product.findOne({ slug: req.params.slug }).populate(
-    "category"
-  );
+  const product = await Product.findOne({ slug: req.params.slug })
+    .populate("category tags")
+    .populate({
+      path: "variations",
+      populate: {
+        path: "attribute",
+        model: "Attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("variation_options");
+
   if (!product)
     return next(new AppError("No product found with that slug", 404));
+
   res.status(200).json({ status: "success", data: { product } });
 });
 
 // CREATE PRODUCT
 exports.createProduct = catchAsync(async (req, res, next) => {
-  const productData = JSON.parse(req.body.product); // from form-data
+  // Step 0: If product data is inside req.body.product as a JSON string, parse it first
+  let productData = req.body;
+  if (typeof req.body.product === "string") {
+    try {
+      productData = JSON.parse(req.body.product);
+    } catch {
+      return next(new AppError("Invalid JSON in product field", 400));
+    }
+  }
 
-  // Auto-generate slug only
-  productData.slug = slugify(productData.name, { lower: true });
+  // Destructure productData
+  let {
+    name,
+    category,
+    subCategory,
+    description,
+    videoUrl,
+    price,
+    sale_price,
+    brand,
+    operating,
+    screen,
+    model,
+    tags,
+    variations,
+    variation_options,
+    product_type,
+    max_price,
+    min_price,
+  } = productData;
 
-  // Handle main image
-  if (req.files?.image?.[0]) {
-    const img = req.files.image[0];
-    productData.image = {
-      index: 1,
-      thumbnail: img.path,
-      original: img.path,
+  // Helper to safely parse JSON strings to arrays
+  function parseToArray(data, fieldName) {
+    if (!data) return [];
+    if (typeof data === "string") {
+      try {
+        const parsed = JSON.parse(data);
+        if (!Array.isArray(parsed)) {
+          throw new Error(`${fieldName} must be an array`);
+        }
+        return parsed;
+      } catch {
+        throw new AppError(`Invalid JSON format for ${fieldName}`, 400);
+      }
+    }
+    if (!Array.isArray(data)) {
+      throw new AppError(`${fieldName} must be an array`, 400);
+    }
+    return data;
+  }
+
+  // Parse arrays safely
+  try {
+    tags = parseToArray(tags, "tags");
+    variations = parseToArray(variations, "variations");
+    variation_options = parseToArray(variation_options, "variation_options");
+  } catch (err) {
+    return next(err);
+  }
+
+  // 1. Create or find Tags
+  const tagIds = [];
+  for (const tag of tags) {
+    let existingTag = await Tag.findOne({ slug: tag.slug });
+    if (!existingTag) {
+      existingTag = await Tag.create(tag);
+    }
+    tagIds.push(existingTag._id);
+  }
+
+  // 2. Create or find Attributes + their Values + Variations
+  const variationIds = [];
+  for (const variation of variations) {
+    // Check if attribute exists
+    let attribute = await Attribute.findOne({ slug: variation.attribute.slug });
+    if (!attribute) {
+      attribute = await Attribute.create({
+        slug: variation.attribute.slug,
+        name: variation.attribute.name,
+        type: variation.attribute.type,
+        values: variation.attribute.values.map((v) => ({
+          value: v.value,
+          image: v.image || null,
+        })),
+      });
+    }
+    // Create Variation with attribute reference
+    const variationDoc = await Variation.create({
+      value: variation.value,
+      attribute: attribute._id,
+    });
+    variationIds.push(variationDoc._id);
+  }
+
+  // 3. Create VariationOptions
+  const variationOptionIds = [];
+  for (const option of variation_options) {
+    const variationOptionDoc = await VariationOption.create({
+      title: option.title,
+      price: option.price,
+      quantity: option.quantity,
+      sku: option.sku,
+      is_disable: option.is_disable || false,
+      image: option.image || null,
+      options: option.options, // array of {name, value}
+    });
+    variationOptionIds.push(variationOptionDoc._id);
+  }
+
+  // 4. Prepare image and gallery from files if uploaded
+  let image = null;
+  if (req.files?.image && req.files.image.length > 0) {
+    image = {
+      original: req.files.image[0].path,
+      thumbnail: req.files.image[0].path,
     };
   }
 
-  // Handle gallery images
-  if (req.files?.gallery) {
-    productData.gallery = req.files.gallery.map((file, index) => ({
-      index: index + 1,
-      thumbnail: file.path,
-      original: file.path,
-    }));
+  let gallery = [];
+  if (req.files?.gallery && req.files.gallery.length > 0) {
+    gallery = req.files.gallery.map((file) => file.path);
   }
 
-  const product = await Product.create(productData);
-  res.status(201).json({ status: "success", data: { product } });
+  // 5. Validate name and create slug from name
+  if (!name || typeof name !== "string") {
+    return next(
+      new AppError("Product name is required and must be a string", 400)
+    );
+  }
+  const slug = slugify(name, { lower: true, strict: true });
+
+  // 6. Create Product
+  const product = await Product.create({
+    name,
+    slug,
+    category,
+    subCategory,
+    description,
+    videoUrl,
+    price,
+    sale_price,
+    brand,
+    operating,
+    screen,
+    model,
+    tags: tagIds,
+    product_type,
+    max_price,
+    min_price,
+    variations: variationIds,
+    variation_options: variationOptionIds,
+    image,
+    gallery,
+    is_active: true,
+  });
+
+  res.status(201).json({
+    status: "success",
+    data: { product },
+  });
 });
-
-exports.getProducts = async (req, res, next) => {
-  try {
-    const products = await Product.find();
-    res.json(products);
-  } catch (err) {
-    next(err);
-  }
-};
 
 // UPDATE PRODUCT
 exports.updateProduct = catchAsync(async (req, res, next) => {
@@ -130,47 +282,38 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     const category = await Category.findById(categoryId);
     if (!category)
       return next(new AppError("No category found with that ID", 404));
-    const childCategory = category.children.id(subCatId);
-    if (!childCategory)
+    if (!category.children.id(subCatId)) {
       return next(
         new AppError("No sub-category found with that ID in this category", 404)
       );
+    }
     req.body.category = categoryId;
     req.body.subCategory = subCatId;
   }
 
-  // If new main image uploaded -> delete old, then set new
+  // Replace main image if uploaded
   if (req.files?.image?.[0]) {
-    // destroy old
-    if (existingProduct.image?.id) await safeDestroy(existingProduct.image.id);
-
-    // set new
+    if (existingProduct.image?.original)
+      await safeDestroy(existingProduct.image.original);
     req.body.image = {
-      id: req.files.image[0].filename,
       original: req.files.image[0].path,
       thumbnail: req.files.image[0].path,
     };
   }
 
-  // If new gallery uploaded -> delete all old gallery images, then set new
+  // Replace gallery if uploaded
   if (req.files?.gallery && req.files.gallery.length > 0) {
-    if (existingProduct.gallery && existingProduct.gallery.length > 0) {
-      for (const img of existingProduct.gallery) {
-        if (img?.id) await safeDestroy(img.id);
+    if (existingProduct.gallery?.length > 0) {
+      for (const imgId of existingProduct.gallery) {
+        await safeDestroy(imgId); // if storing paths, adjust here
       }
     }
-
-    req.body.gallery = req.files.gallery.map((file) => ({
-      id: file.filename,
-      original: file.path,
-      thumbnail: file.path,
-    }));
+    req.body.gallery = [];
   }
 
-  // Let model's pre('save') handle slug — but findByIdAndUpdate doesn't run save middleware.
-  // So if name is updated we must update slug here:
+  // Update slug if name changed
   if (req.body.name) {
-    req.body.slug = slugify(req.body.name, { lower: true });
+    req.body.slug = slugify(req.body.name, { lower: true, strict: true });
   }
 
   const updated = await Product.findByIdAndUpdate(productId, req.body, {
@@ -186,13 +329,10 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
   if (!product) return next(new AppError("No product found with that ID", 404));
 
-  // delete main image
-  if (product.image?.id) await safeDestroy(product.image.id);
-
-  // delete gallery images
-  if (product.gallery && product.gallery.length) {
-    for (const img of product.gallery) {
-      if (img?.id) await safeDestroy(img.id);
+  if (product.image?.original) await safeDestroy(product.image.original);
+  if (product.gallery?.length) {
+    for (const imgId of product.gallery) {
+      await safeDestroy(imgId);
     }
   }
 
