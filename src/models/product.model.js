@@ -1,54 +1,47 @@
+// models/product.model.js
 const mongoose = require("mongoose");
 const slugify = require("slugify");
+const Category = require("./category.model"); // used in validator
 
-// Sub-schemas
-const variationOptionSchema = new mongoose.Schema({
-  title: String,
-  price: Number,
-  quantity: Number,
-  sku: String,
-  is_disable: Number,
-  image: String,
-  options: [
-    {
-      name: String,
-      value: String,
-    },
-  ],
-});
-
-const variationSchema = new mongoose.Schema({
-  attribute_id: Number,
-  value: String,
-  attribute: {
-    id: Number,
-    slug: String,
-    name: String,
-    type: String,
-    values: [
-      {
-        id: Number,
-        attribute_id: Number,
-        value: String,
-        image: String,
-      },
-    ],
+const variationOptionSchema = new mongoose.Schema(
+  {
+    title: String,
+    price: Number,
+    quantity: Number,
+    sku: String,
+    is_disable: Number,
+    image: String,
+    options: [{ name: String, value: String }],
   },
-});
+  { _id: false }
+);
 
-const tagSchema = new mongoose.Schema({
-  id: Number,
-  name: String,
-  slug: String,
-});
+const variationSchema = new mongoose.Schema(
+  {
+    attribute_id: Number,
+    value: String,
+    attribute: {
+      id: Number,
+      slug: String,
+      name: String,
+      type: String,
+      values: [
+        { id: Number, attribute_id: Number, value: String, image: String },
+      ],
+    },
+  },
+  { _id: false }
+);
 
-const imageSchema = new mongoose.Schema({
-  id: Number,
-  thumbnail: String,
-  original: String,
-});
+const tagSchema = new mongoose.Schema(
+  { id: Number, name: String, slug: String },
+  { _id: false }
+);
+const imageSchema = new mongoose.Schema(
+  { id: String, thumbnail: String, original: String },
+  { _id: false }
+);
 
-// Main Product Schema
 const productSchema = new mongoose.Schema(
   {
     id: String,
@@ -62,10 +55,7 @@ const productSchema = new mongoose.Schema(
     image: imageSchema,
     gallery: [imageSchema],
     quantity: Number,
-    price: {
-      type: Number,
-      required: [true, "A product must have a price"],
-    },
+    price: { type: Number, required: [true, "A product must have a price"] },
     sale_price: Number,
     unit: String,
     tag: [tagSchema],
@@ -80,8 +70,7 @@ const productSchema = new mongoose.Schema(
       required: [true, "A product must belong to a category"],
     },
     subCategory: {
-      type: String,
-      enum: ["stroller", "clothes", "towels", "baby-crib-bedding", "pacifiers"],
+      type: mongoose.Schema.Types.ObjectId,
       required: [true, "A product must have a sub-category"],
     },
     ratingsAverage: {
@@ -90,38 +79,37 @@ const productSchema = new mongoose.Schema(
       min: [1, "Rating must be above 1.0"],
       max: [5, "Rating must be below 5.0"],
     },
-    ratingsQuantity: {
-      type: Number,
-      default: 0,
-    },
+    ratingsQuantity: { type: Number, default: 0 },
   },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-// Indexes
 productSchema.index({ slug: 1 });
 productSchema.index({ category: 1 });
 productSchema.index({ subCategory: 1 });
 productSchema.index({ price: 1, ratingsAverage: -1 });
 
-// Document middleware
 productSchema.pre("save", function (next) {
-  this.slug = slugify(this.name, { lower: true });
+  if (this.isModified("name")) this.slug = slugify(this.name, { lower: true });
   next();
 });
 
-// Query middleware
+// schema-level validator that subCategory exists inside parent Category.children
+productSchema.path("subCategory").validate({
+  isAsync: true,
+  validator: async function (value) {
+    if (!this.category || !value) return false;
+    const parent = await Category.findById(this.category).select("children");
+    if (!parent) return false;
+    return !!parent.children.id(value);
+  },
+  message:
+    "subCategory must be a valid child category of the provided category",
+});
+
 productSchema.pre(/^find/, function (next) {
-  this.populate({
-    path: "category",
-    select: "name slug image",
-  });
+  this.populate({ path: "category", select: "name slug image" });
   next();
 });
 
-const Product = mongoose.model("Product", productSchema);
-module.exports = Product;
+module.exports = mongoose.model("Product", productSchema);
