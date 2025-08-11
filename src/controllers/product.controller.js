@@ -5,18 +5,9 @@ const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
 const slugify = require("slugify");
-const { cloudinary } = require("../../config/cloudinary");
+const safeDestroy = require("../utils/safeDestroy");
 
-// Helper to delete cloudinary images (safe)
-async function safeDestroy(publicId) {
-  if (!publicId) return;
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch (err) {
-    // log error, but don't crash (you can use your logger)
-    console.error("Cloudinary destroy error:", err.message);
-  }
-}
+
 
 // GET ALL PRODUCTS (same merged filters as before)
 exports.getAllProducts = catchAsync(async (req, res, next) => {
