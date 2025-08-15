@@ -68,8 +68,8 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
       },
     })
     .populate("variation_options")
-    .populate("image") // <-- Populate image field (single object)
-    .populate("gallery"); // <-- Populate gallery field (array of images)
+    .populate("image")
+    .populate("gallery");
 
   // Apply APIFeatures on the query object
   const features = new APIFeatures(query, req.query)
@@ -98,7 +98,9 @@ exports.getProduct = catchAsync(async (req, res, next) => {
         select: "slug name type values",
       },
     })
-    .populate("variation_options");
+    .populate("variation_options")
+    .populate("image")
+    .populate("gallery");
 
   if (!product)
     return next(new AppError("No product found with that slug", 404));
