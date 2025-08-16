@@ -1,8 +1,5 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const User = require("../src/models/user.model");
-const Category = require("../src/models/category.model");
-// Import other models as needed
 
 const migrateDatabase = async () => {
   try {
@@ -14,43 +11,15 @@ const migrateDatabase = async () => {
 
     console.log("Connected to database");
 
-    // Clear existing data (optional)
-    await mongoose.connection.db.dropDatabase();
-    console.log("Database cleared");
+    // 🔹 Instead of dropping DB, clear specific collections
+    const collections = await mongoose.connection.db.collections();
 
-    // Seed admin user
-    const adminUser = await User.create({
-      name: "Admin User",
-      email: "admin@emberidge.com",
-      password: "admin123",
-      passwordConfirm: "admin123",
-      role: "admin",
-    });
-
-    // Seed sample categories
-    const categories = await Category.insertMany([
-      {
-        name: "Electronics",
-        type: "mega",
-        productCount: 120,
-        children: [
-          { name: "Smartphones", slug: "smartphones" },
-          { name: "Laptops", slug: "laptops" },
-        ],
-      },
-      {
-        name: "Fashion",
-        type: "mega",
-        productCount: 200,
-        children: [
-          { name: "Men's Wear", slug: "mens-wear" },
-          { name: "Women's Wear", slug: "womens-wear" },
-        ],
-      },
-    ]);
+    for (let collection of collections) {
+      await collection.deleteMany({});
+      console.log(`Cleared ${collection.collectionName}`);
+    }
 
     console.log("Database migrated successfully");
-    console.log("Admin credentials:", adminUser.email, "admin123");
     process.exit(0);
   } catch (err) {
     console.error("Migration failed:", err);

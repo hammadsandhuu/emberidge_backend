@@ -7,7 +7,8 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Please tell us your name"],
+      required: [true, "Please provide your user name"],
+      trim: true,
     },
     email: {
       type: String,
@@ -16,7 +17,22 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       validate: [validator.isEmail, "Please provide a valid email"],
     },
-    photo: {
+    address: String,
+    dateOfBirth: Date,
+    phoneNumber: {
+      type: String,
+      validate: {
+        validator: function (v) {
+          return /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(v);
+        },
+        message: "Please enter a valid phone number",
+      },
+    },
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Other"],
+    },
+    avatar: {
       type: String,
       default: "default.jpg",
     },
@@ -50,37 +66,27 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Encrypt password before saving
+// Encrypt password before save
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-
   this.password = await bcrypt.hash(this.password, 12);
   this.passwordConfirm = undefined;
   next();
 });
 
-// Update passwordChangedAt when password is modified
 userSchema.pre("save", function (next) {
   if (!this.isModified("password") || this.isNew) return next();
-
   this.passwordChangedAt = Date.now() - 1000;
   next();
 });
 
-// Instance method to check password
-userSchema.methods.correctPassword = async function (
-  candidatePassword,
-  userPassword
-) {
-  return await bcrypt.compare(candidatePassword, userPassword);
+userSchema.methods.correctPassword = async function (candidate, actual) {
+  return await bcrypt.compare(candidate, actual);
 };
 
-// Instance method to check if password was changed after token was issued
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
   if (this.passwordChangedAt) {
     const changedTimestamp = parseInt(
@@ -92,19 +98,14 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
   return false;
 };
 
-// Instance method to create password reset token
 userSchema.methods.createPasswordResetToken = function () {
   const resetToken = crypto.randomBytes(32).toString("hex");
-
   this.passwordResetToken = crypto
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
-
-  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
   return resetToken;
 };
 
-const User = mongoose.model("User", userSchema);
-module.exports = User;
+module.exports = mongoose.model("User", userSchema);

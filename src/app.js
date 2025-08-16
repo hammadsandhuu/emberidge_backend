@@ -10,6 +10,7 @@ const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const path = require("path");
 const authRoutes = require("./routes/auth.routes");
+const userRoute = require("./routes/user.routes");
 const categoryRoutes = require("./routes/category.routes");
 const productRoutes = require("./routes/product.routes");
 
@@ -64,12 +65,14 @@ app.use(compression());
 // Routes
 
 app.use("/auth", authRoutes);
+app.use("/api/v1/users", userRoute);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/products", productRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world");
 });
+
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
 

@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const categoryController = require("../controllers/category.controller");
 const upload = require("../utils/multer");
-const { protect, restrictTo } = require("../middleware/authMiddleware");
+const { protect, restrictTo } = require("../middleware/auth.middleware");
 
 // Public routes
 router.get("", categoryController.getAllCategories);
