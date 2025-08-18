@@ -24,15 +24,15 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     "phoneNumber",
     "gender",
   ];
-
   const filteredBody = {};
+
   Object.keys(req.body).forEach((el) => {
     if (allowedFields.includes(el)) filteredBody[el] = req.body[el];
   });
 
-  // ✅ agar avatar upload kiya gaya hai to usko bhi update karna
+  // ✅ avatar update
   if (req.file && req.file.path) {
-    filteredBody.avatar = req.file.path; // cloudinary se URL aayega
+    filteredBody.avatar = req.file.path;
   }
 
   const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
@@ -40,8 +40,12 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     runValidators: true,
   });
 
-  res.status(200).json({ status: "success", data: { user: updatedUser } });
+  res.status(200).json({
+    status: "success",
+    data: { user: updatedUser },
+  });
 });
+
 
 
 /* ===========================
