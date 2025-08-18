@@ -23,12 +23,17 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     "dateOfBirth",
     "phoneNumber",
     "gender",
-    "avatar",
   ];
+
   const filteredBody = {};
   Object.keys(req.body).forEach((el) => {
     if (allowedFields.includes(el)) filteredBody[el] = req.body[el];
   });
+
+  // ✅ agar avatar upload kiya gaya hai to usko bhi update karna
+  if (req.file && req.file.path) {
+    filteredBody.avatar = req.file.path; // cloudinary se URL aayega
+  }
 
   const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
     new: true,
@@ -37,6 +42,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 
   res.status(200).json({ status: "success", data: { user: updatedUser } });
 });
+
 
 /* ===========================
    🔹 ADMIN CONTROLLERS

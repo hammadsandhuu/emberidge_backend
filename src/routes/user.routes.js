@@ -1,14 +1,18 @@
 const express = require("express");
 const userController = require("../controllers/user.controller");
+const uploadAvatar = require("../utils/uploadAvatar");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
-// 🔹 Logged-in user routes
 router.get("/me", protect, userController.getMe);
-router.patch("/me", protect, userController.updateMe);
+router.patch(
+  "/me",
+  protect,
+  uploadAvatar.single("avatar"),
+  userController.updateMe
+);
 
-// 🔹 Admin routes
 router.use(protect, restrictTo("admin"));
 router.get("/",userController.getAllUsers)
 
