@@ -6,35 +6,7 @@ const AppError = require("../utils/appError");
 const sendEmail = require("../utils/email");
 const welcomeEmail = require("../templates/emails/welcomeEmail");
 const resetPasswordEmail = require("../templates/emails/resetPasswordEmail");
-
-// helper: sign JWT
-const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
-
-// helper: send JWT in response
-const createSendToken = (user, statusCode, res) => {
-  const token = signToken(user._id);
-
-  const cookieOptions = {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  };
-
-  res.cookie("jwt", token, cookieOptions);
-
-  user.password = undefined;
-
-  res.status(statusCode).json({
-    status: "success",
-    token,
-    data: { user },
-  });
-};
+const { createSendToken } = require("../utils/token");
 
 exports.signup = catchAsync(async (req, res, next) => {
   const newUser = await User.create({
@@ -88,9 +60,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   // 3) Build reset URL
-const resetURL = `${process.env.CLIENT_URL}/auth/reset-password/${resetToken}`;
-
-
+  const resetURL = `${process.env.CLIENT_URL}/auth/reset-password/${resetToken}`;
   try {
     await sendEmail({
       email: user.email,
