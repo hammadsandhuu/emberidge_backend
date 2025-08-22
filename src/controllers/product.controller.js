@@ -62,7 +62,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   if (andConditions.length > 0) filter.$and = andConditions;
 
   let query = Product.find(filter)
-    .populate("category tags")
+    .populate("tags")
     .populate({
       path: "variations",
       populate: {
@@ -91,7 +91,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
 // ------------------ GET SINGLE PRODUCT ------------------
 exports.getProduct = catchAsync(async (req, res, next) => {
   const product = await Product.findOne({ slug: req.params.slug })
-    .populate("category tags")
+    .populate("tags")
     .populate({
       path: "variations",
       populate: {
@@ -117,11 +117,10 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     try {
       productData = JSON.parse(req.body.product);
     } catch {
-      return next(new AppError("Invalid JSON in product field", 400));
+      return errorResponse(res, "Invalid JSON in product field", 400);
     }
   }
 
-  // Destructure
   let {
     name,
     category,
@@ -142,43 +141,37 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     min_price,
   } = productData;
 
-  // ------------------ ✅ CATEGORY EXISTENCE CHECK ------------------
-  if (!category) {
-    return next(new AppError("Category ID is required", 400));
-  }
+  // ✅ CATEGORY EXISTENCE CHECK
+  if (!category) return errorResponse(res, "Category ID is required", 400);
 
   const categoryDoc = await Category.findById(category);
-  if (!categoryDoc) {
-    return next(new AppError("No category found with that ID", 404));
-  }
+  if (!categoryDoc)
+    return errorResponse(res, "No category found with that ID", 404);
 
   if (subCategory) {
-    // Agar subCategory id di gai hai to check karein ke woh isi category ke andar hai
     const subCatExists = categoryDoc.children.id(subCategory);
-    if (!subCatExists) {
-      return next(
-        new AppError("No sub-category found with that ID in this category", 404)
+    if (!subCatExists)
+      return errorResponse(
+        res,
+        "No sub-category found with that ID in this category",
+        404
       );
-    }
   }
 
-  // ------------------ Helper: Parse Arrays ------------------
+  // Helper: Parse Arrays
   function parseToArray(data, fieldName) {
     if (!data) return [];
     if (typeof data === "string") {
       try {
         const parsed = JSON.parse(data);
-        if (!Array.isArray(parsed)) {
-          throw new Error(`${fieldName} must be an array`);
-        }
+        if (!Array.isArray(parsed)) throw new Error();
         return parsed;
       } catch {
         throw new AppError(`Invalid JSON format for ${fieldName}`, 400);
       }
     }
-    if (!Array.isArray(data)) {
+    if (!Array.isArray(data))
       throw new AppError(`${fieldName} must be an array`, 400);
-    }
     return data;
   }
 
@@ -187,20 +180,18 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     variations = parseToArray(variations, "variations");
     variation_options = parseToArray(variation_options, "variation_options");
   } catch (err) {
-    return next(err);
+    return errorResponse(res, err.message, err.statusCode || 400);
   }
 
-  // ------------------ Tags ------------------
+  // Tags
   const tagIds = [];
   for (const tag of tags) {
     let existingTag = await Tag.findOne({ slug: tag.slug });
-    if (!existingTag) {
-      existingTag = await Tag.create(tag);
-    }
+    if (!existingTag) existingTag = await Tag.create(tag);
     tagIds.push(existingTag._id);
   }
 
-  // ------------------ Variations ------------------
+  // Variations
   const variationIds = [];
   for (const variation of variations) {
     let attribute = await Attribute.findOne({ slug: variation.attribute.slug });
@@ -215,7 +206,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
         })),
       });
     }
-
     const variationDoc = await Variation.create({
       value: variation.value,
       attribute: attribute._id,
@@ -223,7 +213,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     variationIds.push(variationDoc._id);
   }
 
-  // ------------------ Variation Options ------------------
+  // Variation Options
   const variationOptionIds = [];
   for (const option of variation_options) {
     const variationOptionDoc = await VariationOption.create({
@@ -238,26 +228,20 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     variationOptionIds.push(variationOptionDoc._id);
   }
 
-  // ------------------ Image & Gallery ------------------
+  // Image & Gallery
   let image = null;
-  if (req.files?.image && req.files.image.length > 0) {
+  if (req.files?.image?.length > 0) {
     const file = req.files.image[0];
-    const imageDoc = new Image({
-      original: file.path,
-      thumbnail: file.path,
-    });
+    const imageDoc = new Image({ original: file.path, thumbnail: file.path });
     await imageDoc.save();
     image = imageDoc._id;
   }
 
   let galleryIds = [];
-  if (req.files?.gallery && req.files.gallery.length > 0) {
+  if (req.files?.gallery?.length > 0) {
     const imageDocs = await Promise.all(
       req.files.gallery.map(async (file) => {
-        const img = new Image({
-          original: file.path,
-          thumbnail: file.path,
-        });
+        const img = new Image({ original: file.path, thumbnail: file.path });
         await img.save();
         return img;
       })
@@ -265,14 +249,14 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     galleryIds = imageDocs.map((img) => img._id);
   }
 
-  // ------------------ Name Required ------------------
-  if (!name || typeof name !== "string") {
-    return next(
-      new AppError("Product name is required and must be a string", 400)
+  if (!name || typeof name !== "string")
+    return errorResponse(
+      res,
+      "Product name is required and must be a string",
+      400
     );
-  }
 
-  // ------------------ CREATE PRODUCT ------------------
+  // CREATE PRODUCT
   const product = await Product.create({
     name,
     category,
@@ -296,10 +280,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     is_active: true,
   });
 
-  res.status(201).json({
-    status: "success",
-    data: { product },
-  });
+  return successResponse(res, { product }, "Product created successfully", 201);
 });
 
 // ------------------ UPDATE PRODUCT ------------------
@@ -309,57 +290,50 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     try {
       productData = JSON.parse(req.body.product);
     } catch {
-      return next(new AppError("Invalid JSON in product field", 400));
+      return errorResponse(res, "Invalid JSON in product field", 400);
     }
   }
 
   const { category, subCategory, tags, variations, variation_options } =
     productData;
 
-  // ------------------ ✅ CATEGORY EXISTENCE CHECK ------------------
+  // ✅ CATEGORY EXISTENCE CHECK
   if (category) {
     const categoryDoc = await Category.findById(category);
-    if (!categoryDoc) {
-      return next(new AppError("No category found with that ID", 404));
-    }
+    if (!categoryDoc)
+      return errorResponse(res, "No category found with that ID", 404);
 
     if (subCategory) {
       const subCatExists = categoryDoc.children.id(subCategory);
-      if (!subCatExists) {
-        return next(
-          new AppError(
-            "No sub-category found with that ID in this category",
-            404
-          )
+      if (!subCatExists)
+        return errorResponse(
+          res,
+          "No sub-category found with that ID in this category",
+          404
         );
-      }
     }
   }
 
-  // ------------------ Helper: Parse Arrays ------------------
+  // Helper: Parse Arrays
   function parseToArray(data, fieldName) {
     if (!data) return [];
     if (typeof data === "string") {
       try {
         const parsed = JSON.parse(data);
-        if (!Array.isArray(parsed)) {
-          throw new Error(`${fieldName} must be an array`);
-        }
+        if (!Array.isArray(parsed)) throw new Error();
         return parsed;
       } catch {
         throw new AppError(`Invalid JSON format for ${fieldName}`, 400);
       }
     }
-    if (!Array.isArray(data)) {
+    if (!Array.isArray(data))
       throw new AppError(`${fieldName} must be an array`, 400);
-    }
     return data;
   }
 
-  let parsedTags = [];
-  let parsedVariations = [];
-  let parsedVariationOptions = [];
-
+  let parsedTags = [],
+    parsedVariations = [],
+    parsedVariationOptions = [];
   try {
     parsedTags = parseToArray(tags, "tags");
     parsedVariations = parseToArray(variations, "variations");
@@ -368,20 +342,18 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
       "variation_options"
     );
   } catch (err) {
-    return next(err);
+    return errorResponse(res, err.message, err.statusCode || 400);
   }
 
-  // ------------------ Tags ------------------
+  // Tags
   const tagIds = [];
   for (const tag of parsedTags) {
     let existingTag = await Tag.findOne({ slug: tag.slug });
-    if (!existingTag) {
-      existingTag = await Tag.create(tag);
-    }
+    if (!existingTag) existingTag = await Tag.create(tag);
     tagIds.push(existingTag._id);
   }
 
-  // ------------------ Variations ------------------
+  // Variations
   const variationIds = [];
   for (const variation of parsedVariations) {
     let attribute = await Attribute.findOne({ slug: variation.attribute.slug });
@@ -396,7 +368,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
         })),
       });
     }
-
     const variationDoc = await Variation.create({
       value: variation.value,
       attribute: attribute._id,
@@ -404,7 +375,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     variationIds.push(variationDoc._id);
   }
 
-  // ------------------ Variation Options ------------------
+  // Variation Options
   const variationOptionIds = [];
   for (const option of parsedVariationOptions) {
     const variationOptionDoc = await VariationOption.create({
@@ -419,26 +390,20 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     variationOptionIds.push(variationOptionDoc._id);
   }
 
-  // ------------------ Image & Gallery ------------------
+  // Image & Gallery
   let image = null;
-  if (req.files?.image && req.files.image.length > 0) {
+  if (req.files?.image?.length > 0) {
     const file = req.files.image[0];
-    const imageDoc = new Image({
-      original: file.path,
-      thumbnail: file.path,
-    });
+    const imageDoc = new Image({ original: file.path, thumbnail: file.path });
     await imageDoc.save();
     image = imageDoc._id;
   }
 
   let galleryIds = [];
-  if (req.files?.gallery && req.files.gallery.length > 0) {
+  if (req.files?.gallery?.length > 0) {
     const imageDocs = await Promise.all(
       req.files.gallery.map(async (file) => {
-        const img = new Image({
-          original: file.path,
-          thumbnail: file.path,
-        });
+        const img = new Image({ original: file.path, thumbnail: file.path });
         await img.save();
         return img;
       })
@@ -446,7 +411,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     galleryIds = imageDocs.map((img) => img._id);
   }
 
-  // ------------------ UPDATE PRODUCT ------------------
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
     {
@@ -460,14 +424,14 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     { new: true, runValidators: true }
   );
 
-  if (!updatedProduct) {
-    return next(new AppError("No product found with that ID", 404));
-  }
+  if (!updatedProduct)
+    return errorResponse(res, "No product found with that ID", 404);
 
-  res.status(200).json({
-    status: "success",
-    data: { product: updatedProduct },
-  });
+  return successResponse(
+    res,
+    { product: updatedProduct },
+    "Product updated successfully"
+  );
 });
 
 // ------------------ DELETE PRODUCT ------------------
