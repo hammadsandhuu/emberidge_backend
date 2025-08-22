@@ -3,6 +3,7 @@ const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
 const { cloudinary } = require("../../config/cloudinary");
+const successResponse = require("../utils/successResponse");
 
 // ========================
 // GET ALL CATEGORIES
@@ -28,11 +29,11 @@ exports.getAllCategories = catchAsync(async (req, res, next) => {
 
   const categories = await features.query;
 
-  res.status(200).json({
-    status: "success",
-    results: categories.length,
-    data: { categories },
-  });
+  return successResponse(
+    res,
+    { categories, count: categories.length },
+    "Categories fetched successfully"
+  );
 });
 
 // ========================
@@ -48,10 +49,7 @@ exports.getCategory = catchAsync(async (req, res, next) => {
     return next(new AppError("No category found with that slug", 404));
   }
 
-  res.status(200).json({
-    status: "success",
-    data: { category },
-  });
+  return successResponse(res, { category }, "Category fetched successfully");
 });
 
 // ========================
@@ -60,8 +58,8 @@ exports.getCategory = catchAsync(async (req, res, next) => {
 exports.createCategory = catchAsync(async (req, res, next) => {
   if (req.file) {
     req.body.image = {
-      id: req.file.filename, // Cloudinary public ID
-      thumbnail: req.file.path, // Cloudinary secure URL
+      id: req.file.filename,
+      thumbnail: req.file.path,
     };
   }
 
@@ -69,10 +67,12 @@ exports.createCategory = catchAsync(async (req, res, next) => {
 
   const newCategory = await Category.create(req.body);
 
-  res.status(201).json({
-    status: "success",
-    data: { category: newCategory },
-  });
+  return successResponse(
+    res,
+    { category: newCategory },
+    "Category created successfully",
+    201
+  );
 });
 
 // ========================
@@ -85,7 +85,6 @@ exports.updateCategory = catchAsync(async (req, res, next) => {
   }
 
   if (req.file) {
-    // Delete old image if exists
     if (category.image && category.image.id) {
       await cloudinary.uploader.destroy(category.image.id);
     }
@@ -101,10 +100,11 @@ exports.updateCategory = catchAsync(async (req, res, next) => {
     { new: true, runValidators: true }
   );
 
-  res.status(200).json({
-    status: "success",
-    data: { category: updatedCategory },
-  });
+  return successResponse(
+    res,
+    { category: updatedCategory },
+    "Category updated successfully"
+  );
 });
 
 // ========================
@@ -122,10 +122,7 @@ exports.deleteCategory = catchAsync(async (req, res, next) => {
 
   await Category.findByIdAndDelete(req.params.id);
 
-  res.status(204).json({
-    status: "success",
-    data: null,
-  });
+  return successResponse(res, null, "Category deleted successfully", 204);
 });
 
 // ========================
@@ -138,7 +135,7 @@ exports.addChildCategory = catchAsync(async (req, res, next) => {
   }
 
   if (
-    req.user.role !== "admin" ||
+    req.user.role !== "admin" &&
     category.createdBy.toString() !== req.user.id
   ) {
     return next(
@@ -156,10 +153,11 @@ exports.addChildCategory = catchAsync(async (req, res, next) => {
   category.children.push(req.body);
   await category.save();
 
-  res.status(200).json({
-    status: "success",
-    data: { category },
-  });
+  return successResponse(
+    res,
+    { category },
+    "Child category added successfully"
+  );
 });
 
 // ========================
@@ -174,7 +172,7 @@ exports.updateChildCategory = catchAsync(async (req, res, next) => {
   }
 
   if (
-    req.user.role !== "admin" ||
+    req.user.role !== "admin" &&
     category.createdBy.toString() !== req.user.id
   ) {
     return next(
@@ -200,10 +198,11 @@ exports.updateChildCategory = catchAsync(async (req, res, next) => {
   childCategory.set(req.body);
   await category.save();
 
-  res.status(200).json({
-    status: "success",
-    data: { category },
-  });
+  return successResponse(
+    res,
+    { category },
+    "Child category updated successfully"
+  );
 });
 
 // ========================
@@ -218,7 +217,7 @@ exports.deleteChildCategory = catchAsync(async (req, res, next) => {
   }
 
   if (
-    req.user.role !== "admin" ||
+    req.user.role !== "admin" &&
     category.createdBy.toString() !== req.user.id
   ) {
     return next(
@@ -238,8 +237,10 @@ exports.deleteChildCategory = catchAsync(async (req, res, next) => {
   category.children.pull(childId);
   await category.save();
 
-  res.status(204).json({
-    status: "success",
-    data: null,
-  });
+  return successResponse(
+    res,
+    { category },
+    "Child category deleted successfully",
+    200
+  );
 });

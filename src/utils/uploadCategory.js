@@ -1,5 +1,5 @@
 const multer = require("multer");
-const { getCloudinaryStorage } = require("../config/cloudinary");
+const { getCloudinaryStorage } = require("../../config/cloudinary");
 
 const uploadCategory = multer({
   storage: getCloudinaryStorage("ecommerce/categories"),

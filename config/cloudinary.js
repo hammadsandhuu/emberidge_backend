@@ -18,7 +18,7 @@ const getCloudinaryStorage = (defaultFolder = "ecommerce/others") => {
         allowed_formats: ["jpg", "jpeg", "png"],
         public_id: `${Date.now()}-${file.originalname
           .split(".")[0]
-          .replace(/[^a-zA-Z0-9-_]/g, "")}`, // ✅ sanitize
+          .replace(/[^a-zA-Z0-9-_]/g, "")}`,
       };
     },
   });

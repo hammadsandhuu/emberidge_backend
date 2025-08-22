@@ -3,17 +3,11 @@ const slugify = require("slugify");
 
 const createSlug = (text) => {
   if (!text) return "";
-
-  // 1. Replace & and other symbols with a space
   let processed = text.replace(/&/g, " ");
-
-  // 2. Add space between camelCase words
   processed = processed.replace(/([a-z])([A-Z])/g, "$1 $2");
-
-  // 3. Remove unwanted special characters, then slugify
   return slugify(processed, {
     lower: true,
-    remove: /[*+~.()'"!:@%$#^?{}<>]/g, // remove special chars
+    remove: /[*+~.()'"!:@%$#^?{}<>]/g,
   });
 };
 
