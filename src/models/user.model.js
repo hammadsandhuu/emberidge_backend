@@ -22,9 +22,7 @@ const userSchema = new mongoose.Schema(
     phoneNumber: {
       type: String,
       validate: {
-        validator: function (v) {
-          return /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(v);
-        },
+        validator: (v) => /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(v),
         message: "Please enter a valid phone number",
       },
     },
@@ -69,9 +67,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Encrypt password before save
+// Encrypt password
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
+
   this.password = await bcrypt.hash(this.password, 12);
   this.passwordConfirm = undefined;
   next();
@@ -79,10 +78,12 @@ userSchema.pre("save", async function (next) {
 
 userSchema.pre("save", function (next) {
   if (!this.isModified("password") || this.isNew) return next();
+
   this.passwordChangedAt = Date.now() - 1000;
   next();
 });
 
+// Methods
 userSchema.methods.correctPassword = async function (candidate, actual) {
   return await bcrypt.compare(candidate, actual);
 };
@@ -100,11 +101,14 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
 
 userSchema.methods.createPasswordResetToken = function () {
   const resetToken = crypto.randomBytes(32).toString("hex");
+
   this.passwordResetToken = crypto
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
+
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+
   return resetToken;
 };
 

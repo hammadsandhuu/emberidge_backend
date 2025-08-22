@@ -8,8 +8,11 @@ const xss = require("xss-clean");
 const hpp = require("hpp");
 const cookieParser = require("cookie-parser");
 const compression = require("compression");
-const errorHandler = require("./middleware/error");
 const path = require("path");
+
+const AppError = require("./utils/appError");
+const errorHandler = require("./middleware/error");
+
 const authRoutes = require("./routes/auth.routes");
 const userRoute = require("./routes/user.routes");
 const categoryRoutes = require("./routes/category.routes");
@@ -46,7 +49,7 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 app.use(xss());
 
-// Parameter pollution prevention
+// Prevent parameter pollution
 app.use(
   hpp({
     whitelist: [
@@ -64,7 +67,6 @@ app.use(
 app.use(compression());
 
 // Routes
-
 app.use("/auth", authRoutes);
 app.use("/api/v1/users", userRoute);
 app.use("/api/v1/categories", categoryRoutes);
@@ -77,12 +79,9 @@ app.get("/", (req, res) => {
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
 
-// 404 handler
-app.all("*", (req, res) => {
-  res.status(404).json({
-    status: "fail",
-    message: `Can't find ${req.originalUrl} on this server!`,
-  });
+// 404 handler -> use AppError
+app.all("*", (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
 // Global error handler

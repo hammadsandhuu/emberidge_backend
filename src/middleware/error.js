@@ -1,39 +1,44 @@
 const AppError = require("../utils/appError");
+const logger = require("../utils/logger");
 
-const handleCastErrorDB = (err) => {
-  const message = `Invalid ${err.path}: ${err.value}`;
-  return new AppError(message, 400);
-};
+// Handle specific DB errors
+const handleCastErrorDB = (err) =>
+  new AppError(`Invalid ${err.path}: ${err.value}`, 400);
 
 const handleDuplicateFieldsDB = (err) => {
-  const value = err.errmsg.match(/(["'])(\\?.)*?\1/)[0];
+  const value = err.keyValue ? JSON.stringify(err.keyValue) : "Duplicate field";
   const message = `Duplicate field value: ${value}. Please use another value!`;
   return new AppError(message, 400);
 };
 
 const handleValidationErrorDB = (err) => {
   const errors = Object.values(err.errors).map((el) => el.message);
-  const message = `Invalid input data. ${errors.join(". ")}`;
-  return new AppError(message, 400);
+  return new AppError("Invalid input data", 400, errors);
 };
 
+// Dev response
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
     status: err.status,
-    error: err,
     message: err.message,
+    error: err,
     stack: err.stack,
+    errors: err.errors || [],
   });
 };
 
+// Prod response
 const sendErrorProd = (err, res) => {
   if (err.isOperational) {
     res.status(err.statusCode).json({
       status: err.status,
       message: err.message,
+      errors: err.errors || [],
     });
   } else {
-    console.error("ERROR", err);
+    // log the error
+    logger.error(err);
+
     res.status(500).json({
       status: "error",
       message: "Something went very wrong!",
@@ -47,8 +52,8 @@ module.exports = (err, req, res, next) => {
 
   if (process.env.NODE_ENV === "development") {
     sendErrorDev(err, res);
-  } else if (process.env.NODE_ENV === "production") {
-    let error = { ...err };
+  } else {
+    let error = { ...err, message: err.message };
 
     if (error.name === "CastError") error = handleCastErrorDB(error);
     if (error.code === 11000) error = handleDuplicateFieldsDB(error);
