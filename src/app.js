@@ -78,7 +78,6 @@ app.get("/", (req, res) => {
 
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
-
 // 404 handler -> use AppError
 app.all("*", (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
