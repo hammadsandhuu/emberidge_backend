@@ -1,5 +1,6 @@
 const AppError = require("../utils/appError");
 const logger = require("../utils/logger");
+const multer = require("multer");
 
 // Handle specific DB errors
 const handleCastErrorDB = (err) =>
@@ -14,6 +15,19 @@ const handleDuplicateFieldsDB = (err) => {
 const handleValidationErrorDB = (err) => {
   const errors = Object.values(err.errors).map((el) => el.message);
   return new AppError("Invalid input data", 400, errors);
+};
+
+// 🔥 Handle Multer errors
+const handleMulterError = (err) => {
+  let message = err.message;
+
+  if (err.code === "LIMIT_FILE_SIZE") {
+    message = "File too large! Max size is 5MB.";
+  } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+    message = "Only JPG, PNG, and WebP images are allowed.";
+  }
+
+  return new AppError(message, 400);
 };
 
 // Dev response
@@ -36,9 +50,7 @@ const sendErrorProd = (err, res) => {
       errors: err.errors || [],
     });
   } else {
-    // log the error
     logger.error(err);
-
     res.status(500).json({
       status: "error",
       message: "Something went very wrong!",
@@ -50,16 +62,20 @@ module.exports = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
-  if (process.env.NODE_ENV === "development") {
-    sendErrorDev(err, res);
+  let error = err;
+
+  // Multer error handling
+  if (err instanceof multer.MulterError) {
+    error = handleMulterError(err);
   } else {
-    let error = { ...err, message: err.message };
+    if (err.name === "CastError") error = handleCastErrorDB(err);
+    if (err.code === 11000) error = handleDuplicateFieldsDB(err);
+    if (err.name === "ValidationError") error = handleValidationErrorDB(err);
+  }
 
-    if (error.name === "CastError") error = handleCastErrorDB(error);
-    if (error.code === 11000) error = handleDuplicateFieldsDB(error);
-    if (error.name === "ValidationError")
-      error = handleValidationErrorDB(error);
-
+  if (process.env.NODE_ENV === "development") {
+    sendErrorDev(error, res);
+  } else {
     sendErrorProd(error, res);
   }
 };

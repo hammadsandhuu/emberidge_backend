@@ -6,6 +6,7 @@ const { protect, restrictTo } = require("../middleware/auth.middleware");
 const router = express.Router();
 
 router.get("/me", protect, userController.getMe);
+
 router.patch(
   "/me",
   protect,
@@ -14,12 +15,13 @@ router.patch(
 );
 
 router.use(protect, restrictTo("admin"));
-router.get("/",userController.getAllUsers)
+
+router.get("/", userController.getAllUsers);
 
 router
   .route("/:id")
-  .get(protect, restrictTo("admin"), userController.getUser)
-  .patch(protect, restrictTo("admin"), userController.updateUser)
-  .delete(protect, restrictTo("admin"), userController.deleteUser);
+  .get(userController.getUser)
+  .patch(userController.updateUser)
+  .delete(userController.deleteUser);
 
 module.exports = router;
