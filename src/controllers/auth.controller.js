@@ -44,7 +44,7 @@ exports.login = catchAsync(async (req, res, next) => {
     return next(new AppError("Incorrect email or password", 401));
   }
 
-  createSendToken(user, 200, res);
+  createSendToken(user, 200, res, "login successfully");
 });
 
 exports.logout = (req, res) => {
@@ -65,7 +65,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
 
-  const resetURL = `${process.env.CLIENT_URL}/auth/reset-password/${resetToken}`;
+  const resetURL = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
 
   try {
     await sendEmail({
