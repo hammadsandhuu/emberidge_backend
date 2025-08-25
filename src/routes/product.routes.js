@@ -7,6 +7,11 @@ const { protect, restrictTo } = require("../middleware/auth.middleware");
 // Public routes
 router.get("/", productController.getAllProducts);
 router.get("/:slug", productController.getProduct);
+router.get("/category/:categorySlug", productController.getProductsByCategory);
+router.get(
+  "/category/:categorySlug/:subCategorySlug",
+  productController.getProductsByCategory
+);
 
 // Admin-only routes
 router.use(protect, restrictTo("admin"));

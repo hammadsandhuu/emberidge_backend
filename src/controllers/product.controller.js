@@ -448,3 +448,55 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
 
   return successResponse(res, null, "Product deleted successfully", 204);
 });
+
+// ------------------ GET PRODUCTS BY CATEGORY ------------------
+exports.getProductsByCategory = catchAsync(async (req, res, next) => {
+  const { categorySlug, subCategorySlug } = req.params;
+
+  //  Validate category
+  const category = await Category.findOne({ slug: categorySlug });
+  if (!category)
+    return errorResponse(res, "No category found with that slug", 404);
+
+  let filter = { category: category._id };
+
+  //  If subCategory provided, validate
+  if (subCategorySlug) {
+    const subCategory = category.children.find(
+      (child) => child.slug === subCategorySlug
+    );
+    if (!subCategory)
+      return errorResponse(res, "No sub-category found with that slug", 404);
+
+    filter.subCategory = subCategory._id;
+  }
+
+  //  Query products
+  let query = Product.find(filter)
+    .populate("tags")
+    .populate({
+      path: "variations",
+      populate: {
+        path: "attribute",
+        model: "Attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("variation_options")
+    .populate("image")
+    .populate("gallery");
+
+  //  Apply API features (pagination, sorting, filtering)
+  const features = new APIFeatures(query, req.query)
+    .sort()
+    .limitFields()
+    .paginate();
+
+  const products = await features.query;
+
+  return successResponse(
+    res,
+    { products, results: products.length },
+    "Products fetched successfully"
+  );
+});
