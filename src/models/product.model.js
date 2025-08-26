@@ -1,65 +1,42 @@
 const mongoose = require("mongoose");
-const slugify = require("slugify");
+const { createSlug, generateUniqueSlug } = require("../utils/slug");
 
-// ================== IMAGE ==================
+/* ===============================
+   SCHEMAS
+================================*/
 const imageSchema = new mongoose.Schema(
-  {
-    thumbnail: { type: String },
-    original: { type: String },
-  },
+  { thumbnail: String, original: String, alt: String },
   { timestamps: true }
 );
 
-// ================== TAG ==================
 const tagSchema = new mongoose.Schema(
   {
-    name: { type: String, trim: true },
-    slug: {
-      type: String,
-      lowercase: true,
-      unique: true,
-      index: true,
-    },
+    name: { type: String, required: true, trim: true },
+    slug: { type: String, unique: true, lowercase: true, index: true },
   },
   { timestamps: true }
-);
-
-// ================== ATTRIBUTE ==================
-const attributeValueSchema = new mongoose.Schema(
-  {
-    value: { type: String, trim: true },
-    image: String,
-  },
-  { _id: false }
 );
 
 const attributeSchema = new mongoose.Schema(
   {
-    slug: { type: String, trim: true, lowercase: true },
     name: { type: String, trim: true },
-    type: { type: String, trim: true },
-    values: [attributeValueSchema],
+    slug: { type: String, unique: true, lowercase: true, index: true },
+    type: {
+      type: String,
+      enum: ["text", "number", "color", "boolean", "select", "multiselect"],
+      default: "text",
+    },
+    values: [{ value: String, image: String }],
+    use_in_filter: { type: Boolean, default: true },
+    is_required: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-// ================== VARIATION ==================
 const variationSchema = new mongoose.Schema(
   {
-    value: { type: String },
-    attribute: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Attribute",
-    },
-  },
-  { timestamps: true }
-);
-
-// ================== VARIATION OPTION ==================
-const optionSchema = new mongoose.Schema(
-  {
-    name: { type: String },
-    value: { type: String },
+    value: { type: String, trim: true },
+    attribute: { type: mongoose.Schema.Types.ObjectId, ref: "Attribute" },
   },
   { timestamps: true }
 );
@@ -67,16 +44,27 @@ const optionSchema = new mongoose.Schema(
 const variationOptionSchema = new mongoose.Schema(
   {
     title: { type: String, trim: true },
+    slug: { type: String, unique: true, index: true }, // auto slug
     price: { type: Number, min: 0 },
-    quantity: { type: Number, min: 0 },
+    quantity: { type: Number, min: 0, default: 0 },
     sku: {
       type: String,
       unique: true,
+      sparse: true,
       match: /^[A-Za-z0-9_-]+$/,
     },
     is_disable: { type: Boolean, default: false },
     image: String,
-    options: [optionSchema],
+    attributes: [
+      {
+        attribute: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Attribute",
+          index: true,
+        },
+        value: { type: String, trim: true },
+      },
+    ],
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
@@ -86,7 +74,6 @@ const variationOptionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ================== PRODUCT ==================
 const productSchema = new mongoose.Schema(
   {
     category: {
@@ -97,83 +84,18 @@ const productSchema = new mongoose.Schema(
     },
     subCategory: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SubCategory",
-      required: true,
+      ref: "Category",
+      default: null,
       index: true,
     },
     name: { type: String, required: true, trim: true },
-
     slug: { type: String, unique: true, index: true },
-
     description: String,
-
-    videoUrl: {
-      type: String,
-      validate: {
-        validator: function (v) {
-          return (
-            !v ||
-            /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/.test(v)
-          );
-        },
-        message: (props) => `${props.value} is not a valid YouTube URL!`,
-      },
-    },
-
-    image: { type: mongoose.Schema.Types.ObjectId, ref: "Image" },
-
-    gallery: [{ type: mongoose.Schema.Types.ObjectId, ref: "Image" }],
-
-    quantity: {
-      type: Number,
-      min: 0,
-      validate: {
-        validator: function (v) {
-          return this.product_type === "simple" || v === undefined;
-        },
-        message: "Quantity should only be defined for simple products",
-      },
-    },
-
-    price: {
-      type: Number,
-      min: 0,
-      validate: {
-        validator: function (v) {
-          return this.product_type === "simple" || v === undefined;
-        },
-        message: "Price should only be defined for simple products",
-      },
-    },
-
-    sale_price: {
-      type: Number,
-      min: 0,
-      validate: [
-        {
-          validator: function (v) {
-            return (
-              v === undefined || this.price === undefined || v <= this.price
-            );
-          },
-          message: "Sale price must be less than or equal to regular price",
-        },
-        {
-          validator: function (v) {
-            return this.product_type === "simple" || v === undefined;
-          },
-          message: "Sale price should only be defined for simple products",
-        },
-      ],
-    },
-
     brand: String,
-    operating: String,
-    screen: String,
     model: String,
-
+    image: { type: mongoose.Schema.Types.ObjectId, ref: "Image" },
+    gallery: [{ type: mongoose.Schema.Types.ObjectId, ref: "Image" }],
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag" }],
-
     product_type: {
       type: String,
       enum: ["simple", "variable"],
@@ -181,38 +103,26 @@ const productSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-
-    max_price: {
+    quantity: { type: Number, min: 0, default: 0 },
+    price: { type: Number, min: 0 },
+    sale_price: {
       type: Number,
+      min: 0,
       validate: {
         validator: function (v) {
-          return this.product_type === "variable" || v === undefined;
+          return v == null || this.price == null || v <= this.price;
         },
-        message: "Max price should only be defined for variable products",
+        message: "Sale price must be <= regular price",
       },
     },
-
-    min_price: {
-      type: Number,
-      validate: {
-        validator: function (v) {
-          return this.product_type === "variable" || v === undefined;
-        },
-        message: "Min price should only be defined for variable products",
-      },
-    },
-
+    min_price: Number,
+    max_price: Number,
     variations: [{ type: mongoose.Schema.Types.ObjectId, ref: "Variation" }],
-
     variation_options: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "VariationOption",
-      },
+      { type: mongoose.Schema.Types.ObjectId, ref: "VariationOption" },
     ],
-
+    in_stock: { type: Boolean, default: true, index: true },
     is_active: { type: Boolean, default: true, index: true },
-
     deletedAt: { type: Date, default: null, index: true },
   },
   {
@@ -229,58 +139,79 @@ const productSchema = new mongoose.Schema(
   }
 );
 
-// ================== Virtuals ==================
-productSchema.virtual("id").get(function () {
-  return this._id.toHexString();
-});
+/* ===============================
+   MODELS
+================================*/
+const Product = mongoose.model("Product", productSchema);
+const VariationOption = mongoose.model(
+  "VariationOption",
+  variationOptionSchema
+);
+const Variation = mongoose.model("Variation", variationSchema);
+const Attribute = mongoose.model("Attribute", attributeSchema);
+const Tag = mongoose.model("Tag", tagSchema);
+const Image = mongoose.model("Image", imageSchema);
 
-productSchema.virtual("on_sale").get(function () {
-  return this.sale_price && this.sale_price < this.price;
-});
-
-productSchema.virtual("in_stock").get(function () {
-  if (this.product_type === "variable") {
-    return (
-      this.variation_options &&
-      this.variation_options.some((opt) => opt.quantity > 0)
-    );
+/* ===============================
+   HELPERS
+================================*/
+async function updateVariableProductStats(productId) {
+  const variationOptions = await VariationOption.find({ product: productId });
+  if (!variationOptions.length) {
+    await Product.findByIdAndUpdate(productId, {
+      min_price: null,
+      max_price: null,
+      in_stock: false,
+      is_active: false,
+    });
+    return;
   }
-  return this.quantity > 0;
-});
 
-// ================== Indexes ==================
-productSchema.index({ price: 1, sale_price: 1 });
-productSchema.index({
-  name: "text",
-  description: "text",
-  brand: "text",
-  model: "text",
-});
+  const prices = variationOptions
+    .map((opt) => opt.price)
+    .filter((p) => typeof p === "number");
+  const stockAvailable = variationOptions.some((opt) => opt.quantity > 0);
 
-// ================== Hooks ==================
+  await Product.findByIdAndUpdate(productId, {
+    min_price: prices.length ? Math.min(...prices) : null,
+    max_price: prices.length ? Math.max(...prices) : null,
+    in_stock: stockAvailable,
+    is_active: stockAvailable,
+  });
+}
+
+/* ===============================
+   HOOKS
+================================*/
 productSchema.pre("save", async function (next) {
-  if (this.isModified("name")) {
-    let baseSlug = slugify(this.name, { lower: true, strict: true });
-    let slug = baseSlug;
-    let counter = 1;
-    while (
-      await mongoose.models.Product.exists({ slug, _id: { $ne: this._id } })
-    ) {
-      slug = `${baseSlug}-${counter++}`;
-    }
-    this.slug = slug;
+  if (this.isModified("name") || !this.slug) {
+    const baseSlug = createSlug(this.name);
+    this.slug = await generateUniqueSlug(this.constructor, baseSlug, this._id);
   }
 
-  // Optional: price range update for variable products should be handled outside or via service
+  if (this.product_type === "simple") this.in_stock = this.quantity > 0;
+  else if (this.product_type === "variable")
+    await updateVariableProductStats(this._id);
+
   next();
 });
 
-// ================== Export Models ==================
+variationOptionSchema.post("save", async function () {
+  if (this.product) await updateVariableProductStats(this.product);
+});
+
+variationOptionSchema.post("findOneAndDelete", async function (doc) {
+  if (doc?.product) await updateVariableProductStats(doc.product);
+});
+
+/* ===============================
+   EXPORT
+================================*/
 module.exports = {
-  Product: mongoose.model("Product", productSchema),
-  Tag: mongoose.model("Tag", tagSchema),
-  Attribute: mongoose.model("Attribute", attributeSchema),
-  Variation: mongoose.model("Variation", variationSchema),
-  VariationOption: mongoose.model("VariationOption", variationOptionSchema),
-  Image: mongoose.model("Image", imageSchema),
+  Product,
+  VariationOption,
+  Variation,
+  Attribute,
+  Tag,
+  Image,
 };

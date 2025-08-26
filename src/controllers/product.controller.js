@@ -10,11 +10,11 @@ const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
-const slugify = require("slugify");
 const safeDestroy = require("../utils/safeDestroy");
 
 const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
+const { generateUniqueSlug, createSlug } = require("../utils/slug");
 
 // ------------------ GET ALL PRODUCTS ------------------
 exports.getAllProducts = catchAsync(async (req, res, next) => {
@@ -113,6 +113,8 @@ exports.getProduct = catchAsync(async (req, res, next) => {
 // ------------------ CREATE PRODUCT ------------------
 exports.createProduct = catchAsync(async (req, res, next) => {
   let productData = req.body;
+
+  // Parse JSON if sent as string
   if (typeof req.body.product === "string") {
     try {
       productData = JSON.parse(req.body.product);
@@ -130,8 +132,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     price,
     sale_price,
     brand,
-    operating,
-    screen,
     model,
     tags,
     variations,
@@ -139,27 +139,18 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     product_type,
     max_price,
     min_price,
+    quantity,
   } = productData;
 
-  // ✅ CATEGORY EXISTENCE CHECK
+  // ------------------ CATEGORY VALIDATION ------------------
   if (!category) return errorResponse(res, "Category ID is required", 400);
-
   const categoryDoc = await Category.findById(category);
-  if (!categoryDoc)
-    return errorResponse(res, "No category found with that ID", 404);
+  if (!categoryDoc) return errorResponse(res, "Category not found", 404);
+  if (subCategory && !categoryDoc.children.id(subCategory))
+    return errorResponse(res, "Sub-category not found in this category", 404);
 
-  if (subCategory) {
-    const subCatExists = categoryDoc.children.id(subCategory);
-    if (!subCatExists)
-      return errorResponse(
-        res,
-        "No sub-category found with that ID in this category",
-        404
-      );
-  }
-
-  // Helper: Parse Arrays
-  function parseToArray(data, fieldName) {
+  // ------------------ HELPER: Parse arrays ------------------
+  const parseArray = (data, fieldName) => {
     if (!data) return [];
     if (typeof data === "string") {
       try {
@@ -167,38 +158,44 @@ exports.createProduct = catchAsync(async (req, res, next) => {
         if (!Array.isArray(parsed)) throw new Error();
         return parsed;
       } catch {
-        throw new AppError(`Invalid JSON format for ${fieldName}`, 400);
+        throw new AppError(`Invalid JSON for ${fieldName}`, 400);
       }
     }
     if (!Array.isArray(data))
       throw new AppError(`${fieldName} must be an array`, 400);
     return data;
-  }
+  };
 
   try {
-    tags = parseToArray(tags, "tags");
-    variations = parseToArray(variations, "variations");
-    variation_options = parseToArray(variation_options, "variation_options");
+    tags = parseArray(tags, "tags");
+    variations = parseArray(variations, "variations");
+    variation_options = parseArray(variation_options, "variation_options");
   } catch (err) {
     return errorResponse(res, err.message, err.statusCode || 400);
   }
 
-  // Tags
+  // ------------------ CREATE TAGS ------------------
   const tagIds = [];
   for (const tag of tags) {
-    let existingTag = await Tag.findOne({ slug: tag.slug });
-    if (!existingTag) existingTag = await Tag.create(tag);
+    const slug = tag.slug || createSlug(tag.name);
+    let existingTag = await Tag.findOne({ slug });
+    if (!existingTag) existingTag = await Tag.create({ name: tag.name, slug });
     tagIds.push(existingTag._id);
   }
 
-  // Variations
+  // ------------------ CREATE ATTRIBUTES & VARIATIONS ------------------
   const variationIds = [];
+  const attributeMap = {}; // slug -> attributeId
+
   for (const variation of variations) {
-    let attribute = await Attribute.findOne({ slug: variation.attribute.slug });
+    const attrName = variation.attribute.name;
+    const attrSlug = variation.attribute.slug || createSlug(attrName);
+    let attribute = await Attribute.findOne({ slug: attrSlug });
+
     if (!attribute) {
       attribute = await Attribute.create({
-        slug: variation.attribute.slug,
-        name: variation.attribute.name,
+        name: attrName,
+        slug: attrSlug,
         type: variation.attribute.type,
         values: variation.attribute.values.map((v) => ({
           value: v.value,
@@ -206,31 +203,19 @@ exports.createProduct = catchAsync(async (req, res, next) => {
         })),
       });
     }
+
     const variationDoc = await Variation.create({
       value: variation.value,
       attribute: attribute._id,
     });
+
     variationIds.push(variationDoc._id);
+    attributeMap[attrSlug] = attribute._id;
   }
 
-  // Variation Options
-  const variationOptionIds = [];
-  for (const option of variation_options) {
-    const variationOptionDoc = await VariationOption.create({
-      title: option.title,
-      price: option.price,
-      quantity: option.quantity,
-      sku: option.sku,
-      is_disable: option.is_disable || false,
-      image: option.image || null,
-      options: option.options,
-    });
-    variationOptionIds.push(variationOptionDoc._id);
-  }
-
-  // Image & Gallery
+  // ------------------ IMAGE & GALLERY ------------------
   let image = null;
-  if (req.files?.image?.length > 0) {
+  if (req.files?.image?.length) {
     const file = req.files.image[0];
     const imageDoc = new Image({ original: file.path, thumbnail: file.path });
     await imageDoc.save();
@@ -238,7 +223,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
   }
 
   let galleryIds = [];
-  if (req.files?.gallery?.length > 0) {
+  if (req.files?.gallery?.length) {
     const imageDocs = await Promise.all(
       req.files.gallery.map(async (file) => {
         const img = new Image({ original: file.path, thumbnail: file.path });
@@ -249,36 +234,59 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     galleryIds = imageDocs.map((img) => img._id);
   }
 
-  if (!name || typeof name !== "string")
-    return errorResponse(
-      res,
-      "Product name is required and must be a string",
-      400
-    );
+  // ------------------ CREATE PRODUCT ------------------
+  const baseSlug = createSlug(name);
+  const uniqueSlug = await generateUniqueSlug(Product, baseSlug);
 
-  // CREATE PRODUCT
   const product = await Product.create({
     name,
+    slug: uniqueSlug,
     category,
     subCategory,
     description,
     videoUrl,
-    price,
-    sale_price,
+    price: product_type === "simple" ? price : null,
+    sale_price: product_type === "simple" ? sale_price : null,
     brand,
-    operating,
-    screen,
     model,
     tags: tagIds,
     product_type,
-    max_price,
-    min_price,
+    max_price: product_type === "variable" ? max_price : null,
+    min_price: product_type === "variable" ? min_price : null,
     variations: variationIds,
-    variation_options: variationOptionIds,
+    variation_options: [],
     image,
     gallery: galleryIds,
     is_active: true,
+    quantity: product_type === "simple" ? quantity || 0 : 0,
   });
+
+  // ------------------ CREATE VARIATION OPTIONS ------------------
+  const variationOptionIds = [];
+  for (const option of variation_options) {
+    const attributesMapped = option.attributes?.map((attr) => ({
+      attribute: attributeMap[attr.name] || attributeMap[createSlug(attr.name)],
+      value: attr.value,
+    }));
+
+    const optionSlug = option.slug || createSlug(option.title);
+    const variationOptionDoc = await VariationOption.create({
+      title: option.title,
+      price: option.price,
+      quantity: option.quantity,
+      sku: option.sku,
+      is_disable: option.is_disable || false,
+      image: option.image || null,
+      attributes: attributesMapped || [],
+      product: product._id,
+      slug: optionSlug,
+    });
+
+    variationOptionIds.push(variationOptionDoc._id);
+  }
+
+  product.variation_options = variationOptionIds;
+  await product.save();
 
   return successResponse(res, { product }, "Product created successfully", 201);
 });
@@ -286,6 +294,8 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 // ------------------ UPDATE PRODUCT ------------------
 exports.updateProduct = catchAsync(async (req, res, next) => {
   let productData = req.body;
+
+  // Parse JSON if sent as string
   if (typeof req.body.product === "string") {
     try {
       productData = JSON.parse(req.body.product);
@@ -294,28 +304,34 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     }
   }
 
-  const { category, subCategory, tags, variations, variation_options } =
-    productData;
+  const {
+    category,
+    subCategory,
+    tags,
+    variations,
+    variation_options,
+    product_type,
+    quantity,
+    price,
+    sale_price,
+  } = productData;
 
-  // ✅ CATEGORY EXISTENCE CHECK
+  // ------------------ CATEGORY VALIDATION ------------------
   if (category) {
     const categoryDoc = await Category.findById(category);
     if (!categoryDoc)
       return errorResponse(res, "No category found with that ID", 404);
 
-    if (subCategory) {
-      const subCatExists = categoryDoc.children.id(subCategory);
-      if (!subCatExists)
-        return errorResponse(
-          res,
-          "No sub-category found with that ID in this category",
-          404
-        );
-    }
+    if (subCategory && !categoryDoc.children.id(subCategory))
+      return errorResponse(
+        res,
+        "No sub-category found with that ID in this category",
+        404
+      );
   }
 
-  // Helper: Parse Arrays
-  function parseToArray(data, fieldName) {
+  // ------------------ HELPER: Parse arrays ------------------
+  const parseArray = (data, fieldName) => {
     if (!data) return [];
     if (typeof data === "string") {
       try {
@@ -323,44 +339,43 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
         if (!Array.isArray(parsed)) throw new Error();
         return parsed;
       } catch {
-        throw new AppError(`Invalid JSON format for ${fieldName}`, 400);
+        throw new AppError(`Invalid JSON for ${fieldName}`, 400);
       }
     }
     if (!Array.isArray(data))
       throw new AppError(`${fieldName} must be an array`, 400);
     return data;
-  }
+  };
 
-  let parsedTags = [],
-    parsedVariations = [],
-    parsedVariationOptions = [];
-  try {
-    parsedTags = parseToArray(tags, "tags");
-    parsedVariations = parseToArray(variations, "variations");
-    parsedVariationOptions = parseToArray(
-      variation_options,
-      "variation_options"
-    );
-  } catch (err) {
-    return errorResponse(res, err.message, err.statusCode || 400);
-  }
+  const parsedTags = parseArray(tags, "tags");
+  const parsedVariations = parseArray(variations, "variations");
+  const parsedVariationOptions = parseArray(
+    variation_options,
+    "variation_options"
+  );
 
-  // Tags
+  // ------------------ TAGS ------------------
   const tagIds = [];
   for (const tag of parsedTags) {
-    let existingTag = await Tag.findOne({ slug: tag.slug });
-    if (!existingTag) existingTag = await Tag.create(tag);
+    const slug = tag.slug || createSlug(tag.name);
+    let existingTag = await Tag.findOne({ slug });
+    if (!existingTag) existingTag = await Tag.create({ name: tag.name, slug });
     tagIds.push(existingTag._id);
   }
 
-  // Variations
+  // ------------------ VARIATIONS & ATTRIBUTES ------------------
   const variationIds = [];
+  const attributeMap = {}; // slug -> attributeId
+
   for (const variation of parsedVariations) {
-    let attribute = await Attribute.findOne({ slug: variation.attribute.slug });
+    const attrName = variation.attribute.name;
+    const attrSlug = variation.attribute.slug || createSlug(attrName);
+
+    let attribute = await Attribute.findOne({ slug: attrSlug });
     if (!attribute) {
       attribute = await Attribute.create({
-        slug: variation.attribute.slug,
-        name: variation.attribute.name,
+        name: attrName,
+        slug: attrSlug,
         type: variation.attribute.type,
         values: variation.attribute.values.map((v) => ({
           value: v.value,
@@ -368,16 +383,25 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
         })),
       });
     }
+
     const variationDoc = await Variation.create({
       value: variation.value,
       attribute: attribute._id,
     });
+
     variationIds.push(variationDoc._id);
+    attributeMap[attrSlug] = attribute._id;
   }
 
-  // Variation Options
+  // ------------------ VARIATION OPTIONS ------------------
   const variationOptionIds = [];
   for (const option of parsedVariationOptions) {
+    const attributesMapped = option.attributes?.map((attr) => ({
+      attribute: attributeMap[attr.name] || attributeMap[createSlug(attr.name)],
+      value: attr.value,
+    }));
+
+    const optionSlug = option.slug || createSlug(option.title);
     const variationOptionDoc = await VariationOption.create({
       title: option.title,
       price: option.price,
@@ -385,12 +409,15 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
       sku: option.sku,
       is_disable: option.is_disable || false,
       image: option.image || null,
-      options: option.options,
+      attributes: attributesMapped || [],
+      product: req.params.id,
+      slug: optionSlug,
     });
+
     variationOptionIds.push(variationOptionDoc._id);
   }
 
-  // Image & Gallery
+  // ------------------ IMAGE & GALLERY ------------------
   let image = null;
   if (req.files?.image?.length > 0) {
     const file = req.files.image[0];
@@ -411,6 +438,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     galleryIds = imageDocs.map((img) => img._id);
   }
 
+  // ------------------ UPDATE PRODUCT ------------------
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
     {
@@ -420,6 +448,11 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
       variation_options: variationOptionIds,
       ...(image && { image }),
       ...(galleryIds.length > 0 && { gallery: galleryIds }),
+      ...(product_type === "simple" && { price, sale_price, quantity }),
+      ...(product_type === "variable" && {
+        min_price: productData.min_price,
+        max_price: productData.max_price,
+      }),
     },
     { new: true, runValidators: true }
   );
@@ -433,6 +466,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     "Product updated successfully"
   );
 });
+
 
 // ------------------ DELETE PRODUCT ------------------
 exports.deleteProduct = catchAsync(async (req, res, next) => {
