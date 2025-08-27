@@ -44,7 +44,7 @@ const variationSchema = new mongoose.Schema(
 const variationOptionSchema = new mongoose.Schema(
   {
     title: { type: String, trim: true },
-    slug: { type: String, unique: true, index: true }, // auto slug
+    slug: { type: String, unique: true, index: true },
     price: { type: Number, min: 0 },
     quantity: { type: Number, min: 0, default: 0 },
     sku: {
@@ -73,6 +73,62 @@ const variationOptionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+/* ===============================
+   REVIEW SCHEMA
+================================*/
+const reviewSchema = new mongoose.Schema(
+  {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+      index: true,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5,
+      validate: {
+        validator: Number.isInteger,
+        message: "Rating must be an integer between 1 and 5",
+      },
+    },
+    title: { type: String, trim: true, maxlength: 100 },
+    comment: { type: String, trim: true, maxlength: 1000 },
+    is_approved: { type: Boolean, default: false, index: true },
+    helpful: { type: Number, default: 0, min: 0 },
+    not_helpful: { type: Number, default: 0, min: 0 },
+  },
+  { timestamps: true }
+);
+
+// Compound index to ensure one review per user per product
+reviewSchema.index({ product: 1, user: 1 }, { unique: true });
+
+// Virtual for review status
+reviewSchema.virtual("status").get(function () {
+  return this.is_approved ? "approved" : "pending";
+});
+
+// Method to mark review as helpful
+reviewSchema.methods.markHelpful = function () {
+  this.helpful += 1;
+  return this.save();
+};
+
+// Method to mark review as not helpful
+reviewSchema.methods.markNotHelpful = function () {
+  this.not_helpful += 1;
+  return this.save();
+};
 
 const productSchema = new mongoose.Schema(
   {
@@ -124,6 +180,25 @@ const productSchema = new mongoose.Schema(
     in_stock: { type: Boolean, default: true, index: true },
     is_active: { type: Boolean, default: true, index: true },
     deletedAt: { type: Date, default: null, index: true },
+
+    // Rating and Review fields
+    ratingsAverage: {
+      type: Number,
+      default: 0,
+      min: [0, "Rating must be at least 0"],
+      max: [5, "Rating cannot be more than 5"],
+      set: (val) => Math.round(val * 10) / 10,
+    },
+    ratingsQuantity: {
+      type: Number,
+      default: 0,
+    },
+    reviews: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Review",
+      },
+    ],
   },
   {
     timestamps: true,
@@ -139,10 +214,35 @@ const productSchema = new mongoose.Schema(
   }
 );
 
+// Virtual for reviews count
+productSchema.virtual("reviewsCount").get(function () {
+  return this.reviews.length;
+});
+
+// Virtual for rating distribution (simplified version)
+productSchema.virtual("ratingSummary").get(function () {
+  return {
+    average: this.ratingsAverage,
+    total: this.ratingsQuantity,
+    distribution: {
+      5: 0,
+      4: 0,
+      3: 0,
+      2: 0,
+      1: 0,
+    },
+  };
+});
+
+// Index for better performance on rating queries
+productSchema.index({ ratingsAverage: -1 });
+productSchema.index({ ratingsQuantity: -1 });
+
 /* ===============================
    MODELS
 ================================*/
 const Product = mongoose.model("Product", productSchema);
+const Review = mongoose.model("Review", reviewSchema);
 const VariationOption = mongoose.model(
   "VariationOption",
   variationOptionSchema
@@ -180,6 +280,27 @@ async function updateVariableProductStats(productId) {
   });
 }
 
+// Helper to update product ratings
+async function updateProductRatings(productId) {
+  const reviews = await Review.find({ product: productId, is_approved: true });
+
+  if (reviews.length === 0) {
+    await Product.findByIdAndUpdate(productId, {
+      ratingsAverage: 0,
+      ratingsQuantity: 0,
+    });
+    return;
+  }
+
+  const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+  const averageRating = totalRating / reviews.length;
+
+  await Product.findByIdAndUpdate(productId, {
+    ratingsAverage: averageRating,
+    ratingsQuantity: reviews.length,
+  });
+}
+
 /* ===============================
    HOOKS
 ================================*/
@@ -204,14 +325,26 @@ variationOptionSchema.post("findOneAndDelete", async function (doc) {
   if (doc?.product) await updateVariableProductStats(doc.product);
 });
 
+// Update product ratings when a review is deleted
+reviewSchema.post("findOneAndDelete", async function (doc) {
+  if (doc?.product) {
+    await Product.findByIdAndUpdate(doc.product, {
+      $pull: { reviews: doc._id },
+    });
+    await updateProductRatings(doc.product);
+  }
+});
+
 /* ===============================
    EXPORT
 ================================*/
 module.exports = {
   Product,
+  Review,
   VariationOption,
   Variation,
   Attribute,
   Tag,
   Image,
+  updateProductRatings,
 };

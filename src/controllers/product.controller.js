@@ -1,10 +1,12 @@
 const {
   Product,
+  Review,
   Tag,
   Image,
   Attribute,
   Variation,
   VariationOption,
+  updateProductRatings,
 } = require("../models/product.model");
 const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
@@ -102,7 +104,15 @@ exports.getProduct = catchAsync(async (req, res, next) => {
     })
     .populate("variation_options")
     .populate("image")
-    .populate("gallery");
+    .populate("gallery")
+    .populate({
+      path: "reviews",
+      populate: {
+        path: "user",
+        select: "name email",
+      },
+      match: { is_approved: true },
+    });
 
   if (!product)
     return errorResponse(res, "No product found with that slug", 404);
@@ -114,7 +124,6 @@ exports.getProduct = catchAsync(async (req, res, next) => {
 exports.createProduct = catchAsync(async (req, res, next) => {
   let productData = req.body;
 
-  // Parse JSON if sent as string
   if (typeof req.body.product === "string") {
     try {
       productData = JSON.parse(req.body.product);
@@ -142,14 +151,12 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     quantity,
   } = productData;
 
-  // ------------------ CATEGORY VALIDATION ------------------
   if (!category) return errorResponse(res, "Category ID is required", 400);
   const categoryDoc = await Category.findById(category);
   if (!categoryDoc) return errorResponse(res, "Category not found", 404);
   if (subCategory && !categoryDoc.children.id(subCategory))
     return errorResponse(res, "Sub-category not found in this category", 404);
 
-  // ------------------ HELPER: Parse arrays ------------------
   const parseArray = (data, fieldName) => {
     if (!data) return [];
     if (typeof data === "string") {
@@ -174,7 +181,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     return errorResponse(res, err.message, err.statusCode || 400);
   }
 
-  // ------------------ CREATE TAGS ------------------
   const tagIds = [];
   for (const tag of tags) {
     const slug = tag.slug || createSlug(tag.name);
@@ -183,9 +189,8 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     tagIds.push(existingTag._id);
   }
 
-  // ------------------ CREATE ATTRIBUTES & VARIATIONS ------------------
   const variationIds = [];
-  const attributeMap = {}; // slug -> attributeId
+  const attributeMap = {};
 
   for (const variation of variations) {
     const attrName = variation.attribute.name;
@@ -213,7 +218,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     attributeMap[attrSlug] = attribute._id;
   }
 
-  // ------------------ IMAGE & GALLERY ------------------
   let image = null;
   if (req.files?.image?.length) {
     const file = req.files.image[0];
@@ -234,7 +238,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     galleryIds = imageDocs.map((img) => img._id);
   }
 
-  // ------------------ CREATE PRODUCT ------------------
   const baseSlug = createSlug(name);
   const uniqueSlug = await generateUniqueSlug(Product, baseSlug);
 
@@ -261,7 +264,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     quantity: product_type === "simple" ? quantity || 0 : 0,
   });
 
-  // ------------------ CREATE VARIATION OPTIONS ------------------
   const variationOptionIds = [];
   for (const option of variation_options) {
     const attributesMapped = option.attributes?.map((attr) => ({
@@ -295,7 +297,6 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 exports.updateProduct = catchAsync(async (req, res, next) => {
   let productData = req.body;
 
-  // Parse JSON if sent as string
   if (typeof req.body.product === "string") {
     try {
       productData = JSON.parse(req.body.product);
@@ -316,7 +317,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     sale_price,
   } = productData;
 
-  // ------------------ CATEGORY VALIDATION ------------------
   if (category) {
     const categoryDoc = await Category.findById(category);
     if (!categoryDoc)
@@ -330,7 +330,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
       );
   }
 
-  // ------------------ HELPER: Parse arrays ------------------
   const parseArray = (data, fieldName) => {
     if (!data) return [];
     if (typeof data === "string") {
@@ -354,7 +353,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     "variation_options"
   );
 
-  // ------------------ TAGS ------------------
   const tagIds = [];
   for (const tag of parsedTags) {
     const slug = tag.slug || createSlug(tag.name);
@@ -363,9 +361,8 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     tagIds.push(existingTag._id);
   }
 
-  // ------------------ VARIATIONS & ATTRIBUTES ------------------
   const variationIds = [];
-  const attributeMap = {}; // slug -> attributeId
+  const attributeMap = {};
 
   for (const variation of parsedVariations) {
     const attrName = variation.attribute.name;
@@ -393,7 +390,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     attributeMap[attrSlug] = attribute._id;
   }
 
-  // ------------------ VARIATION OPTIONS ------------------
   const variationOptionIds = [];
   for (const option of parsedVariationOptions) {
     const attributesMapped = option.attributes?.map((attr) => ({
@@ -417,7 +413,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     variationOptionIds.push(variationOptionDoc._id);
   }
 
-  // ------------------ IMAGE & GALLERY ------------------
   let image = null;
   if (req.files?.image?.length > 0) {
     const file = req.files.image[0];
@@ -438,7 +433,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     galleryIds = imageDocs.map((img) => img._id);
   }
 
-  // ------------------ UPDATE PRODUCT ------------------
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
     {
@@ -467,7 +461,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   );
 });
 
-
 // ------------------ DELETE PRODUCT ------------------
 exports.deleteProduct = catchAsync(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
@@ -487,14 +480,12 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
 exports.getProductsByCategory = catchAsync(async (req, res, next) => {
   const { categorySlug, subCategorySlug } = req.params;
 
-  //  Validate category
   const category = await Category.findOne({ slug: categorySlug });
   if (!category)
     return errorResponse(res, "No category found with that slug", 404);
 
   let filter = { category: category._id };
 
-  //  If subCategory provided, validate
   if (subCategorySlug) {
     const subCategory = category.children.find(
       (child) => child.slug === subCategorySlug
@@ -505,7 +496,6 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
     filter.subCategory = subCategory._id;
   }
 
-  //  Query products
   let query = Product.find(filter)
     .populate("tags")
     .populate({
@@ -518,9 +508,16 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
     })
     .populate("variation_options")
     .populate("image")
-    .populate("gallery");
+    .populate("gallery")
+    .populate({
+      path: "reviews",
+      populate: {
+        path: "user",
+        select: "name",
+      },
+      match: { is_approved: true },
+    });
 
-  //  Apply API features (pagination, sorting, filtering)
   const features = new APIFeatures(query, req.query)
     .sort()
     .limitFields()
@@ -533,4 +530,221 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
     { products, results: products.length },
     "Products fetched successfully"
   );
+});
+
+// ------------------ REVIEW CONTROLLERS ------------------
+
+// ------------------ CREATE REVIEW ------------------
+exports.createReview = catchAsync(async (req, res, next) => {
+  const { rating, title, comment } = req.body;
+  const productId = req.params.id;
+  const userId = req.user._id;
+
+  const product = await Product.findById(productId);
+  if (!product) return errorResponse(res, "Product not found", 404);
+
+  const existingReview = await Review.findOne({
+    product: productId,
+    user: userId,
+  });
+  if (existingReview) {
+    return errorResponse(res, "You have already reviewed this product", 400);
+  }
+
+  const review = await Review.create({
+    product: productId,
+    user: userId,
+    rating,
+    title,
+    comment,
+    is_approved: req.user.role === "admin",
+  });
+
+  product.reviews.push(review._id);
+  await product.save();
+
+  await updateProductRatings(productId);
+
+  const populatedReview = await Review.findById(review._id).populate({
+    path: "user",
+    select: "name email",
+  });
+
+  return successResponse(
+    res,
+    { review: populatedReview },
+    "Review created successfully",
+    201
+  );
+});
+
+// ------------------ GET PRODUCT REVIEWS ------------------
+exports.getProductReviews = catchAsync(async (req, res, next) => {
+  const productId = req.params.id;
+
+  const reviews = await Review.find({ product: productId, is_approved: true })
+    .populate({
+      path: "user",
+      select: "name email",
+    })
+    .sort({ createdAt: -1 });
+
+  const product = await Product.findById(productId);
+  if (!product) return errorResponse(res, "Product not found", 404);
+
+  return successResponse(
+    res,
+    {
+      reviews,
+      total: reviews.length,
+      averageRating: product.ratingsAverage,
+      totalRatings: product.ratingsQuantity,
+    },
+    "Reviews fetched successfully"
+  );
+});
+
+// ------------------ UPDATE REVIEW ------------------
+exports.updateReview = catchAsync(async (req, res, next) => {
+  const { rating, title, comment } = req.body;
+  const reviewId = req.params.reviewId;
+
+  const review = await Review.findById(reviewId);
+  if (!review) return errorResponse(res, "Review not found", 404);
+
+  if (
+    review.user.toString() !== req.user._id.toString() &&
+    req.user.role !== "admin"
+  ) {
+    return errorResponse(res, "You can only update your own reviews", 403);
+  }
+
+  const oldRating = review.rating;
+
+  const updatedReview = await Review.findByIdAndUpdate(
+    reviewId,
+    { rating, title, comment },
+    { new: true, runValidators: true }
+  ).populate({
+    path: "user",
+    select: "name email",
+  });
+
+  if (rating !== oldRating) {
+    await updateProductRatings(review.product);
+  }
+
+  return successResponse(
+    res,
+    { review: updatedReview },
+    "Review updated successfully"
+  );
+});
+
+// ------------------ DELETE REVIEW ------------------
+exports.deleteReview = catchAsync(async (req, res, next) => {
+  const reviewId = req.params.reviewId;
+
+  const review = await Review.findById(reviewId);
+  if (!review) return errorResponse(res, "Review not found", 404);
+
+  if (
+    review.user.toString() !== req.user._id.toString() &&
+    req.user.role !== "admin"
+  ) {
+    return errorResponse(res, "You can only delete your own reviews", 403);
+  }
+
+  await Product.findByIdAndUpdate(review.product, {
+    $pull: { reviews: reviewId },
+  });
+
+  await Review.findByIdAndDelete(reviewId);
+
+  await updateProductRatings(review.product);
+
+  return successResponse(res, null, "Review deleted successfully", 204);
+});
+
+// ------------------ MODERATE REVIEW (ADMIN) ------------------
+exports.moderateReview = catchAsync(async (req, res, next) => {
+  const { is_approved } = req.body;
+  const reviewId = req.params.reviewId;
+
+  const review = await Review.findByIdAndUpdate(
+    reviewId,
+    { is_approved },
+    { new: true, runValidators: true }
+  ).populate({
+    path: "user",
+    select: "name email",
+  });
+
+  if (!review) return errorResponse(res, "Review not found", 404);
+
+  await updateProductRatings(review.product);
+
+  return successResponse(
+    res,
+    { review },
+    `Review ${is_approved ? "approved" : "rejected"} successfully`
+  );
+});
+
+// ------------------ GET ALL REVIEWS (ADMIN) ------------------
+exports.getAllReviews = catchAsync(async (req, res, next) => {
+  const filter = {};
+
+  if (req.query.status) {
+    filter.is_approved = req.query.status === "approved";
+  }
+
+  if (req.query.product) {
+    filter.product = req.query.product;
+  }
+
+  if (req.query.user) {
+    filter.user = req.query.user;
+  }
+
+  const reviews = await Review.find(filter)
+    .populate({
+      path: "user",
+      select: "name email",
+    })
+    .populate({
+      path: "product",
+      select: "name slug",
+    })
+    .sort({ createdAt: -1 });
+
+  return successResponse(
+    res,
+    { reviews, total: reviews.length },
+    "Reviews fetched successfully"
+  );
+});
+
+// ------------------ MARK REVIEW HELPFUL ------------------
+exports.markReviewHelpful = catchAsync(async (req, res, next) => {
+  const reviewId = req.params.reviewId;
+
+  const review = await Review.findById(reviewId);
+  if (!review) return errorResponse(res, "Review not found", 404);
+
+  await review.markHelpful();
+
+  return successResponse(res, { review }, "Review marked as helpful");
+});
+
+// ------------------ MARK REVIEW NOT HELPFUL ------------------
+exports.markReviewNotHelpful = catchAsync(async (req, res, next) => {
+  const reviewId = req.params.reviewId;
+
+  const review = await Review.findById(reviewId);
+  if (!review) return errorResponse(res, "Review not found", 404);
+
+  await review.markNotHelpful();
+
+  return successResponse(res, { review }, "Review marked as not helpful");
 });
