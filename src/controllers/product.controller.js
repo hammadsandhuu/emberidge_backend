@@ -107,18 +107,35 @@ exports.getProduct = catchAsync(async (req, res, next) => {
     .populate("gallery")
     .populate({
       path: "reviews",
+      match: { is_approved: true },
       populate: {
         path: "user",
         select: "name email",
       },
-      match: { is_approved: true },
     });
 
   if (!product)
     return errorResponse(res, "No product found with that slug", 404);
 
-  return successResponse(res, { product }, "Product fetched successfully");
+  // Convert Mongoose doc to plain object
+  const productData = product.toObject();
+
+  // Transform reviews: send only counts
+  productData.reviews = productData.reviews.map((review) => ({
+    ...review,
+    helpful: review.helpfulUsers ? review.helpfulUsers.length : 0,
+    not_helpful: review.notHelpfulUsers ? review.notHelpfulUsers.length : 0,
+    helpfulUsers: undefined, // remove array
+    notHelpfulUsers: undefined, // remove array
+  }));
+
+  return successResponse(
+    res,
+    { product: productData },
+    "Product fetched successfully"
+  );
 });
+
 
 // ------------------ CREATE PRODUCT ------------------
 exports.createProduct = catchAsync(async (req, res, next) => {
