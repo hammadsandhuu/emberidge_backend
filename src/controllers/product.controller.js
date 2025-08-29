@@ -557,7 +557,7 @@ exports.createReview = catchAsync(async (req, res, next) => {
     rating,
     title,
     comment,
-    is_approved: req.user.role === "admin",
+    is_approved: true,
   });
 
   product.reviews.push(review._id);
@@ -728,23 +728,72 @@ exports.getAllReviews = catchAsync(async (req, res, next) => {
 // ------------------ MARK REVIEW HELPFUL ------------------
 exports.markReviewHelpful = catchAsync(async (req, res, next) => {
   const reviewId = req.params.reviewId;
+  const userId = req.user._id;
 
   const review = await Review.findById(reviewId);
   if (!review) return errorResponse(res, "Review not found", 404);
 
-  await review.markHelpful();
+  // Remove user from notHelpfulUsers if they had voted not helpful
+  review.notHelpfulUsers = review.notHelpfulUsers.filter(
+    (id) => id.toString() !== userId.toString()
+  );
 
-  return successResponse(res, { review }, "Review marked as helpful");
+  if (review.helpfulUsers.some((id) => id.toString() === userId.toString())) {
+    // If already marked helpful, toggle off
+    review.helpfulUsers = review.helpfulUsers.filter(
+      (id) => id.toString() !== userId.toString()
+    );
+  } else {
+    // Otherwise, add user to helpfulUsers
+    review.helpfulUsers.push(userId);
+  }
+
+  await review.save();
+
+  return successResponse(
+    res,
+    {
+      helpfulCount: review.helpfulUsers.length,
+      notHelpfulCount: review.notHelpfulUsers.length,
+    },
+    "Helpful vote updated"
+  );
 });
 
 // ------------------ MARK REVIEW NOT HELPFUL ------------------
 exports.markReviewNotHelpful = catchAsync(async (req, res, next) => {
   const reviewId = req.params.reviewId;
+  const userId = req.user._id;
 
   const review = await Review.findById(reviewId);
   if (!review) return errorResponse(res, "Review not found", 404);
 
-  await review.markNotHelpful();
+  // Remove user from helpfulUsers if they had voted helpful
+  review.helpfulUsers = review.helpfulUsers.filter(
+    (id) => id.toString() !== userId.toString()
+  );
 
-  return successResponse(res, { review }, "Review marked as not helpful");
+  if (
+    review.notHelpfulUsers.some((id) => id.toString() === userId.toString())
+  ) {
+    // If already marked not helpful, toggle off
+    review.notHelpfulUsers = review.notHelpfulUsers.filter(
+      (id) => id.toString() !== userId.toString()
+    );
+  } else {
+    // Otherwise, add user to notHelpfulUsers
+    review.notHelpfulUsers.push(userId);
+  }
+
+  await review.save();
+
+  return successResponse(
+    res,
+    {
+      helpfulCount: review.helpfulUsers.length,
+      notHelpfulCount: review.notHelpfulUsers.length,
+    },
+    "Not helpful vote updated"
+  );
 });
+

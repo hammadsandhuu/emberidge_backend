@@ -104,8 +104,8 @@ const reviewSchema = new mongoose.Schema(
     title: { type: String, trim: true, maxlength: 100 },
     comment: { type: String, trim: true, maxlength: 1000 },
     is_approved: { type: Boolean, default: false, index: true },
-    helpful: { type: Number, default: 0, min: 0 },
-    not_helpful: { type: Number, default: 0, min: 0 },
+    helpfulUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    notHelpfulUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );
