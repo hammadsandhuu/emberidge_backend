@@ -25,6 +25,7 @@ fs.readdirSync(modelsPath)
 
 // Load Seed Data
 const seedData = require("./seedData.json");
+const { generateUniqueSlug, createSlug } = require("../src/utils/slug");
 
 /* ================================
    HELPER FUNCTIONS
@@ -92,46 +93,152 @@ async function dropDB() {
   return true;
 }
 
-/** Seed database with default data */
+/** Seed database with default data without products*/
+// async function seedDB() {
+//   console.log("Seeding database with data from seedData.json...");
+
+//   const User = mongoose.models.User;
+//   const Category = mongoose.models.Category;
+
+//   // Create Users
+//   const users = [];
+//   for (const user of seedData.users) {
+//     const existingUser = await User.findOne({ email: user.email });
+//     if (!existingUser) {
+//       const newUser = await User.create(user);
+//       users.push(newUser);
+//       console.log(`Created user: ${user.email}`);
+//     } else {
+//       users.push(existingUser);
+//       console.log(`User already exists: ${user.email}`);
+//     }
+//   }
+
+//   const admin = users[0];
+
+//   // Create Categories
+//   for (const category of seedData.categories) {
+//     const existingCategory = await Category.findOne({ name: category.name });
+//     if (!existingCategory) {
+//       await Category.create({
+//         name: category.name,
+//         createdBy: admin._id,
+//         children: category.children.map((child) => ({ name: child })),
+//       });
+//       console.log(`Created category: ${category.name}`);
+//     } else {
+//       console.log(`Category already exists: ${category.name}`);
+//     }
+//   }
+
+//   console.log("Seeding complete.");
+// }
+
+/** Seed database with default data with products*/
 async function seedDB() {
   console.log("Seeding database with data from seedData.json...");
 
   const User = mongoose.models.User;
   const Category = mongoose.models.Category;
+  const Product = mongoose.models.Product;
+  const Tag = mongoose.models.Tag;
 
-  // Create Users
+  // 1. Users
   const users = [];
   for (const user of seedData.users) {
     const existingUser = await User.findOne({ email: user.email });
     if (!existingUser) {
-      const newUser = await User.create(user);
-      users.push(newUser);
+      users.push(await User.create(user));
       console.log(`Created user: ${user.email}`);
-    } else {
-      users.push(existingUser);
-      console.log(`User already exists: ${user.email}`);
+    } else users.push(existingUser);
+  }
+  const admin = users[0];
+
+  // 2. Categories + subcategories
+  const categoryMap = {};
+  for (const cat of seedData.categories) {
+    let category = await Category.findOne({ name: cat.name });
+    if (!category) {
+      category = await Category.create({
+        name: cat.name,
+        createdBy: admin._id,
+        children: cat.children.map((c) => ({ name: c })),
+      });
+      console.log(`Created category: ${cat.name}`);
+    }
+
+    for (const child of cat.children) {
+      const childObj = category.children.find((c) => c.name === child);
+      if (childObj) categoryMap[`${cat.name}|${child}`] = childObj._id;
     }
   }
 
-  const admin = users[0];
-
-  // Create Categories
-  for (const category of seedData.categories) {
-    const existingCategory = await Category.findOne({ name: category.name });
-    if (!existingCategory) {
-      await Category.create({
-        name: category.name,
-        createdBy: admin._id,
-        children: category.children.map((child) => ({ name: child })),
-      });
-      console.log(`Created category: ${category.name}`);
-    } else {
-      console.log(`Category already exists: ${category.name}`);
+  // 3. Tags
+  const tagMap = {};
+  for (const product of seedData.products) {
+    for (const t of product.tags) {
+      if (!tagMap[t.name]) {
+        let tagDoc = await Tag.findOne({ name: t.name });
+        if (!tagDoc) {
+          tagDoc = await Tag.create({
+            name: t.name,
+            slug: await generateUniqueSlug(Tag, createSlug(t.name)),
+            createdBy: admin._id,
+          });
+          console.log(`Created tag: ${t.name}`);
+        }
+        tagMap[t.name] = tagDoc._id;
+      }
     }
+  }
+
+  // 4. Products
+  // Clean up any old products with null slug to avoid unique index errors
+  await Product.deleteMany({ slug: null });
+
+  for (const prod of seedData.products) {
+    const subCategoryId = categoryMap[`${prod.category}|${prod.subCategory}`];
+    if (!subCategoryId) {
+      console.log(`Skipping product ${prod.name} - subcategory not found`);
+      continue;
+    }
+
+    const tagIds = prod.tags.map((t) => tagMap[t.name]);
+
+    const mainCategory = await Category.findOne({ name: prod.category });
+    if (!mainCategory) {
+      console.log(`Skipping product ${prod.name} - main category not found`);
+      continue;
+    }
+
+    const exists = await Product.findOne({
+      name: prod.name,
+      subCategory: subCategoryId,
+    });
+    if (exists) continue;
+
+    // Generate a unique slug for the product
+    const slug = await generateUniqueSlug(Product, createSlug(prod.name));
+
+    await Product.create({
+      ...prod,
+      category: mainCategory._id,
+      subCategory: subCategoryId,
+      tags: tagIds,
+      createdBy: admin._id,
+      slug, // ✅ Add slug here
+    });
+
+    console.log(`Created product: ${prod.name}`);
   }
 
   console.log("Seeding complete.");
 }
+
+
+
+
+
 
 /* ================================
    MAIN SCRIPT

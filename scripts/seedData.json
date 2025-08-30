@@ -29,5 +29,567 @@
         "Health & Care"
       ]
     }
+  ],
+  "products": [
+    {
+      "name": "Premium Leather Key Chain",
+      "category": "Accessories",
+      "subCategory": "Key Chain",
+      "description": "Durable leather key chain with metal clasp.",
+      "product_details": "Genuine leather, Metal clasp, Lightweight",
+      "additional_info": {
+        "material": "Leather",
+        "color": "Brown",
+        "weight": "50g"
+      },
+      "price": 15,
+      "quantity": 100,
+      "brand": "KeyMaster",
+      "model": "KM-LC01",
+      "tags": [{ "name": "Key Chain" }, { "name": "Leather" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Premium Leather Key Chain",
+      "category": "Accessories",
+      "subCategory": "Key Chain",
+      "description": "Durable leather key chain with metal clasp.",
+      "product_details": "Genuine leather, Metal clasp, Lightweight",
+      "additional_info": {
+        "material": "Leather",
+        "color": "Brown",
+        "weight": "50g"
+      },
+      "price": 15,
+      "sale_price": 12,
+      "quantity": 100,
+      "brand": "KeyMaster",
+      "model": "KM-LC01",
+      "tags": [{ "name": "Key Chain" }, { "name": "Leather" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Luxury Wrist Watch",
+      "category": "Accessories",
+      "subCategory": "Watches",
+      "description": "Elegant stainless steel wrist watch with leather strap.",
+      "product_details": "Water-resistant up to 50m, Quartz movement, 1-year warranty",
+      "additional_info": {
+        "material": "Stainless Steel",
+        "color": "Silver",
+        "weight": "120g"
+      },
+      "price": 250,
+      "quantity": 50,
+      "brand": "TimeMaster",
+      "model": "TM-Classic",
+      "tags": [{ "name": "Luxury" }, { "name": "Watch" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Luxury Wrist Watch",
+      "category": "Accessories",
+      "subCategory": "Watches",
+      "description": "Elegant stainless steel wrist watch with leather strap.",
+      "product_details": "Water-resistant up to 50m, Quartz movement, 1-year warranty",
+      "additional_info": {
+        "material": "Stainless Steel",
+        "color": "Silver",
+        "weight": "120g"
+      },
+      "price": 250,
+      "sale_price": 220,
+      "quantity": 50,
+      "brand": "TimeMaster",
+      "model": "TM-Classic",
+      "tags": [{ "name": "Luxury" }, { "name": "Watch" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Classic Aviator Sunglasses",
+      "category": "Accessories",
+      "subCategory": "Sunglasses",
+      "description": "Stylish aviator sunglasses with UV protection.",
+      "product_details": "UV400 protection, Metal frame, Lightweight",
+      "additional_info": {
+        "material": "Metal",
+        "color": "Black",
+        "weight": "60g"
+      },
+      "price": 80,
+      "quantity": 50,
+      "brand": "SunStyle",
+      "model": "SS-AV01",
+      "tags": [{ "name": "Sunglasses" }, { "name": "UV Protection" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Classic Aviator Sunglasses",
+      "category": "Accessories",
+      "subCategory": "Sunglasses",
+      "description": "Stylish aviator sunglasses with UV protection.",
+      "product_details": "UV400 protection, Metal frame, Lightweight",
+      "additional_info": {
+        "material": "Metal",
+        "color": "Black",
+        "weight": "60g"
+      },
+      "price": 80,
+      "sale_price": 65,
+      "quantity": 50,
+      "brand": "SunStyle",
+      "model": "SS-AV01",
+      "tags": [{ "name": "Sunglasses" }, { "name": "UV Protection" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Elegant Leather Tote Bag",
+      "category": "Accessories",
+      "subCategory": "Bags",
+      "description": "Spacious leather tote bag for everyday use.",
+      "product_details": "Genuine leather, Multiple compartments, Lightweight",
+      "additional_info": {
+        "material": "Leather",
+        "color": "Tan",
+        "weight": "700g"
+      },
+      "price": 120,
+      "quantity": 30,
+      "brand": "BagMaster",
+      "model": "BM-Tote01",
+      "tags": [{ "name": "Bag" }, { "name": "Leather" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Elegant Leather Tote Bag",
+      "category": "Accessories",
+      "subCategory": "Bags",
+      "description": "Spacious leather tote bag for everyday use.",
+      "product_details": "Genuine leather, Multiple compartments, Lightweight",
+      "additional_info": {
+        "material": "Leather",
+        "color": "Tan",
+        "weight": "700g"
+      },
+      "price": 120,
+      "sale_price": 100,
+      "quantity": 30,
+      "brand": "BagMaster",
+      "model": "BM-Tote01",
+      "tags": [{ "name": "Bag" }, { "name": "Leather" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Soft Cotton Baby Romper",
+      "category": "Baby Products",
+      "subCategory": "Clothing",
+      "description": "Comfortable cotton romper for babies.",
+      "product_details": "100% cotton, Machine washable, Soft fabric",
+      "additional_info": {
+        "material": "Cotton",
+        "color": "Blue",
+        "weight": "100g"
+      },
+      "price": 20,
+      "quantity": 50,
+      "brand": "BabyComfort",
+      "model": "BC-RM01",
+      "tags": [{ "name": "Baby" }, { "name": "Clothing" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Soft Cotton Baby Romper",
+      "category": "Baby Products",
+      "subCategory": "Clothing",
+      "description": "Comfortable cotton romper for babies.",
+      "product_details": "100% cotton, Machine washable, Soft fabric",
+      "additional_info": {
+        "material": "Cotton",
+        "color": "Blue",
+        "weight": "100g"
+      },
+      "price": 20,
+      "sale_price": 16,
+      "quantity": 50,
+      "brand": "BabyComfort",
+      "model": "BC-RM01",
+      "tags": [{ "name": "Baby" }, { "name": "Clothing" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Baby Soft Shoes",
+      "category": "Baby Products",
+      "subCategory": "Footwear",
+      "description": "Soft and comfortable shoes for babies learning to walk.",
+      "product_details": "Non-slip sole, Soft material, Lightweight",
+      "additional_info": {
+        "material": "Fabric",
+        "color": "Pink",
+        "weight": "80g"
+      },
+      "price": 15,
+      "quantity": 50,
+      "brand": "TinySteps",
+      "model": "TS-SH01",
+      "tags": [{ "name": "Baby" }, { "name": "Footwear" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Baby Soft Shoes",
+      "category": "Baby Products",
+      "subCategory": "Footwear",
+      "description": "Soft and comfortable shoes for babies learning to walk.",
+      "product_details": "Non-slip sole, Soft material, Lightweight",
+      "additional_info": {
+        "material": "Fabric",
+        "color": "Pink",
+        "weight": "80g"
+      },
+      "price": 15,
+      "sale_price": 12,
+      "quantity": 50,
+      "brand": "TinySteps",
+      "model": "TS-SH01",
+      "tags": [{ "name": "Baby" }, { "name": "Footwear" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Gentle Baby Diapers Pack",
+      "category": "Baby Products",
+      "subCategory": "Diapers & Wipes",
+      "description": "Soft and absorbent diapers for babies.",
+      "product_details": "Hypoallergenic, 12-hour protection, Soft material",
+      "additional_info": {
+        "material": "Cotton blend",
+        "color": "White",
+        "weight": "500g"
+      },
+      "price": 30,
+      "quantity": 100,
+      "brand": "BabyCare",
+      "model": "BC-DP01",
+      "tags": [{ "name": "Baby" }, { "name": "Diapers" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Gentle Baby Diapers Pack",
+      "category": "Baby Products",
+      "subCategory": "Diapers & Wipes",
+      "description": "Soft and absorbent diapers for babies.",
+      "product_details": "Hypoallergenic, 12-hour protection, Soft material",
+      "additional_info": {
+        "material": "Cotton blend",
+        "color": "White",
+        "weight": "500g"
+      },
+      "price": 30,
+      "sale_price": 25,
+      "quantity": 100,
+      "brand": "BabyCare",
+      "model": "BC-DP01",
+      "tags": [{ "name": "Baby" }, { "name": "Diapers" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Baby Feeding Bottle Set",
+      "category": "Baby Products",
+      "subCategory": "Feeding & Nursing",
+      "description": "BPA-free baby feeding bottles with measurement markings.",
+      "product_details": "BPA-free, Easy to clean, Leak-proof",
+      "additional_info": {
+        "material": "Plastic",
+        "color": "Transparent",
+        "weight": "200g"
+      },
+      "price": 25,
+      "quantity": 40,
+      "brand": "FeedMate",
+      "model": "FM-BF01",
+      "tags": [{ "name": "Baby" }, { "name": "Feeding" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Baby Feeding Bottle Set",
+      "category": "Baby Products",
+      "subCategory": "Feeding & Nursing",
+      "description": "BPA-free baby feeding bottles with measurement markings.",
+      "product_details": "BPA-free, Easy to clean, Leak-proof",
+      "additional_info": {
+        "material": "Plastic",
+        "color": "Transparent",
+        "weight": "200g"
+      },
+      "price": 25,
+      "sale_price": 20,
+      "quantity": 40,
+      "brand": "FeedMate",
+      "model": "FM-BF01",
+      "tags": [{ "name": "Baby" }, { "name": "Feeding" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Soft Plush Baby Toy",
+      "category": "Baby Products",
+      "subCategory": "Toys",
+      "description": "Cute and soft plush toy for babies.",
+      "product_details": "Non-toxic material, Machine washable, Safe for all ages",
+      "additional_info": {
+        "material": "Plush fabric",
+        "color": "Yellow",
+        "weight": "150g"
+      },
+      "price": 18,
+      "quantity": 60,
+      "brand": "ToyBaby",
+      "model": "TB-PL01",
+      "tags": [{ "name": "Baby" }, { "name": "Toys" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Soft Plush Baby Toy",
+      "category": "Baby Products",
+      "subCategory": "Toys",
+      "description": "Cute and soft plush toy for babies.",
+      "product_details": "Non-toxic material, Machine washable, Safe for all ages",
+      "additional_info": {
+        "material": "Plush fabric",
+        "color": "Yellow",
+        "weight": "150g"
+      },
+      "price": 18,
+      "sale_price": 15,
+      "quantity": 60,
+      "brand": "ToyBaby",
+      "model": "TB-PL01",
+      "tags": [{ "name": "Baby" }, { "name": "Toys" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Infant Stroller",
+      "category": "Baby Products",
+      "subCategory": "Strollers & Car Seats",
+      "description": "Lightweight and foldable stroller for infants.",
+      "product_details": "Foldable, Safety harness, Adjustable recline",
+      "additional_info": {
+        "material": "Aluminum frame",
+        "color": "Gray",
+        "weight": "7kg"
+      },
+      "price": 200,
+      "quantity": 20,
+      "brand": "SafeRide",
+      "model": "SR-ST01",
+      "tags": [{ "name": "Baby" }, { "name": "Stroller" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Infant Stroller",
+      "category": "Baby Products",
+      "subCategory": "Strollers & Car Seats",
+      "description": "Lightweight and foldable stroller for infants.",
+      "product_details": "Foldable, Safety harness, Adjustable recline",
+      "additional_info": {
+        "material": "Aluminum frame",
+        "color": "Gray",
+        "weight": "7kg"
+      },
+      "price": 200,
+      "sale_price": 180,
+      "quantity": 20,
+      "brand": "SafeRide",
+      "model": "SR-ST01",
+      "tags": [{ "name": "Baby" }, { "name": "Stroller" }],
+      "product_type": "simple"
+    },
+
+    {
+      "name": "Gentle Baby Shampoo",
+      "category": "Baby Products",
+      "subCategory": "Bath & Skincare",
+      "description": "Tear-free shampoo suitable for newborns.",
+      "product_details": "Hypoallergenic, Gentle formula, Dermatologist tested",
+      "additional_info": {
+        "material": "Liquid",
+        "color": "Transparent",
+        "weight": "250g"
+      },
+      "price": 12,
+      "quantity": 100,
+      "brand": "BabyCare",
+      "model": "BC-SH01",
+      "tags": [{ "name": "Baby" }, { "name": "Skincare" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Gentle Baby Shampoo",
+      "category": "Baby Products",
+      "subCategory": "Bath & Skincare",
+      "description": "Tear-free shampoo suitable for newborns.",
+      "product_details": "Hypoallergenic, Gentle formula, Dermatologist tested",
+      "additional_info": {
+        "material": "Liquid",
+        "color": "Transparent",
+        "weight": "250g"
+      },
+      "price": 12,
+      "sale_price": 10,
+      "quantity": 100,
+      "brand": "BabyCare",
+      "model": "BC-SH01",
+      "tags": [{ "name": "Baby" }, { "name": "Skincare" }],
+      "product_type": "simple"
+    },
+
+    {
+      "name": "Cotton Baby Bedding Set",
+      "category": "Baby Products",
+      "subCategory": "Bedding",
+      "description": "Soft and comfortable bedding set for babies.",
+      "product_details": "100% cotton, Machine washable, Hypoallergenic",
+      "additional_info": {
+        "material": "Cotton",
+        "color": "Pastel Blue",
+        "weight": "1.5kg"
+      },
+      "price": 50,
+      "quantity": 30,
+      "brand": "BabyComfort",
+      "model": "BC-BD01",
+      "tags": [{ "name": "Baby" }, { "name": "Bedding" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Cotton Baby Bedding Set",
+      "category": "Baby Products",
+      "subCategory": "Bedding",
+      "description": "Soft and comfortable bedding set for babies.",
+      "product_details": "100% cotton, Machine washable, Hypoallergenic",
+      "additional_info": {
+        "material": "Cotton",
+        "color": "Pastel Blue",
+        "weight": "1.5kg"
+      },
+      "price": 50,
+      "sale_price": 45,
+      "quantity": 30,
+      "brand": "BabyComfort",
+      "model": "BC-BD01",
+      "tags": [{ "name": "Baby" }, { "name": "Bedding" }],
+      "product_type": "simple"
+    },
+
+    {
+      "name": "Wooden Baby Crib",
+      "category": "Baby Products",
+      "subCategory": "Furniture",
+      "description": "Sturdy wooden crib with adjustable mattress height.",
+      "product_details": "Solid wood, Non-toxic finish, Adjustable mattress height",
+      "additional_info": {
+        "material": "Wood",
+        "color": "White",
+        "weight": "25kg"
+      },
+      "price": 250,
+      "quantity": 15,
+      "brand": "SafeSleep",
+      "model": "SS-CR01",
+      "tags": [{ "name": "Baby" }, { "name": "Furniture" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Wooden Baby Crib",
+      "category": "Baby Products",
+      "subCategory": "Furniture",
+      "description": "Sturdy wooden crib with adjustable mattress height.",
+      "product_details": "Solid wood, Non-toxic finish, Adjustable mattress height",
+      "additional_info": {
+        "material": "Wood",
+        "color": "White",
+        "weight": "25kg"
+      },
+      "price": 250,
+      "sale_price": 220,
+      "quantity": 15,
+      "brand": "SafeSleep",
+      "model": "SS-CR01",
+      "tags": [{ "name": "Baby" }, { "name": "Furniture" }],
+      "product_type": "simple"
+    },
+
+    {
+      "name": "Baby Safety Gate",
+      "category": "Baby Products",
+      "subCategory": "Baby Safety",
+      "description": "Adjustable safety gate to keep babies secure.",
+      "product_details": "Adjustable width, Easy installation, Sturdy material",
+      "additional_info": {
+        "material": "Metal",
+        "color": "White",
+        "weight": "5kg"
+      },
+      "price": 45,
+      "quantity": 40,
+      "brand": "SafeHome",
+      "model": "SH-GT01",
+      "tags": [{ "name": "Baby" }, { "name": "Safety" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Baby Safety Gate",
+      "category": "Baby Products",
+      "subCategory": "Baby Safety",
+      "description": "Adjustable safety gate to keep babies secure.",
+      "product_details": "Adjustable width, Easy installation, Sturdy material",
+      "additional_info": {
+        "material": "Metal",
+        "color": "White",
+        "weight": "5kg"
+      },
+      "price": 45,
+      "sale_price": 38,
+      "quantity": 40,
+      "brand": "SafeHome",
+      "model": "SH-GT01",
+      "tags": [{ "name": "Baby" }, { "name": "Safety" }],
+      "product_type": "simple"
+    },
+
+    {
+      "name": "Baby Thermometer",
+      "category": "Baby Products",
+      "subCategory": "Health & Care",
+      "description": "Digital thermometer for accurate baby temperature measurement.",
+      "product_details": "Fast reading, Easy to use, Safe for babies",
+      "additional_info": {
+        "material": "Plastic",
+        "color": "White",
+        "weight": "50g"
+      },
+      "price": 15,
+      "quantity": 60,
+      "brand": "HealthMate",
+      "model": "HM-TH01",
+      "tags": [{ "name": "Baby" }, { "name": "Health" }],
+      "product_type": "simple"
+    },
+    {
+      "name": "Baby Thermometer",
+      "category": "Baby Products",
+      "subCategory": "Health & Care",
+      "description": "Digital thermometer for accurate baby temperature measurement.",
+      "product_details": "Fast reading, Easy to use, Safe for babies",
+      "additional_info": {
+        "material": "Plastic",
+        "color": "White",
+        "weight": "50g"
+      },
+      "price": 15,
+      "sale_price": 12,
+      "quantity": 60,
+      "brand": "HealthMate",
+      "model": "HM-TH01",
+      "tags": [{ "name": "Baby" }, { "name": "Health" }],
+      "product_type": "simple"
+    }
   ]
 }

@@ -146,7 +146,16 @@ const productSchema = new mongoose.Schema(
     },
     name: { type: String, required: true, trim: true },
     slug: { type: String, unique: true, index: true },
-    description: String,
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 5000,
+    },
+    product_details: {
+      type: String,
+      trim: true,
+      maxlength: 5000,
+    },
     brand: String,
     model: String,
     image: { type: mongoose.Schema.Types.ObjectId, ref: "Image" },
@@ -171,6 +180,9 @@ const productSchema = new mongoose.Schema(
         message: "Sale price must be <= regular price",
       },
     },
+    on_sale: { type: Boolean, default: false },
+    sale_start: { type: Date },
+    sale_end: { type: Date },
     min_price: Number,
     max_price: Number,
     variations: [{ type: mongoose.Schema.Types.ObjectId, ref: "Variation" }],
@@ -179,6 +191,11 @@ const productSchema = new mongoose.Schema(
     ],
     in_stock: { type: Boolean, default: true, index: true },
     is_active: { type: Boolean, default: true, index: true },
+    additional_info: {
+      type: Map,
+      of: String,
+      default: {},
+    },
     deletedAt: { type: Date, default: null, index: true },
 
     // Rating and Review fields
@@ -314,6 +331,13 @@ productSchema.pre("save", async function (next) {
   else if (this.product_type === "variable")
     await updateVariableProductStats(this._id);
 
+  next();
+});
+tagSchema.pre("save", async function (next) {
+  if (this.isModified("name") || !this.slug) {
+    const baseSlug = createSlug(this.name);
+    this.slug = await generateUniqueSlug(this.constructor, baseSlug, this._id);
+  }
   next();
 });
 
