@@ -68,6 +68,8 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   /* ------------------ QUERY WITH POPULATE ------------------ */
   let query = Product.find(filter)
     .populate("tags", "name slug")
+    .populate("category", "name slug")
+    .populate("subCategory", "name slug")
     .populate({
       path: "variations",
       populate: {
