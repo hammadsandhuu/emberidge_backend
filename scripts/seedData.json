@@ -1,0 +1,33 @@
+{
+  "users": [
+    {
+      "name": "Admin User",
+      "email": "admin@example.com",
+      "password": "password",
+      "passwordConfirm": "password",
+      "role": "admin"
+    }
+  ],
+  "categories": [
+    {
+      "name": "Accessories",
+      "children": ["Key Chain", "Watches", "Sunglasses", "Bags"]
+    },
+    {
+      "name": "Baby Products",
+      "children": [
+        "Clothing",
+        "Footwear",
+        "Diapers & Wipes",
+        "Feeding & Nursing",
+        "Toys",
+        "Strollers & Car Seats",
+        "Bath & Skincare",
+        "Bedding",
+        "Furniture",
+        "Baby Safety",
+        "Health & Care"
+      ]
+    }
+  ]
+}
