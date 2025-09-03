@@ -543,27 +543,88 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
   return successResponse(res, "Product deleted successfully", 204);
 });
 
-// ------------------ GET PRODUCTS BY CATEGORY ------------------
+// ------------------ GET PRODUCTS BY CATEGORY (WITH FILTERS) ------------------
 exports.getProductsByCategory = catchAsync(async (req, res, next) => {
-  const { categorySlug, subCategorySlug } = req.params;
+  const { parent: categorySlug, child: subCategorySlug } = req.query;
+  if (!categorySlug) {
+    return errorResponse(res, "Parent category slug is required", 400);
+  }
 
+  // Find parent category
   const category = await Category.findOne({ slug: categorySlug });
-  if (!category)
+  if (!category) {
     return errorResponse(res, "No category found with that slug", 404);
+  }
 
+  // Basic filter setup
   let filter = { category: category._id };
 
+  // Sub-category filter
   if (subCategorySlug) {
     const subCategory = category.children.find(
       (child) => child.slug === subCategorySlug
     );
-    if (!subCategory)
+    if (!subCategory) {
       return errorResponse(res, "No sub-category found with that slug", 404);
-
+    }
     filter.subCategory = subCategory._id;
   }
 
-  /* ------------------ QUERY WITH POPULATE ------------------ */
+  // ------------------ ADD FILTERS ------------------
+  const { minPrice, maxPrice, inStock, onSale, attributes, tags, search } =
+    req.query;
+
+  // Price Range Filter
+  if (minPrice || maxPrice) {
+    filter.price = {};
+    if (minPrice) filter.price.$gte = Number(minPrice);
+    if (maxPrice) filter.price.$lte = Number(maxPrice);
+  }
+
+  // Stock Filter
+  if (inStock === "true") filter.in_stock = true;
+
+  // On Sale Filter
+  if (onSale === "true") filter.on_sale = true;
+
+  // Tags Filter (comma separated slugs)
+  if (tags) {
+    const tagSlugs = tags.split(",");
+    const tagDocs = await Tag.find({ slug: { $in: tagSlugs } }).select("_id");
+    filter.tags = { $in: tagDocs.map((tag) => tag._id) };
+  }
+
+  // Attribute Filters (Example: ?attributes=color:red,size:XL)
+  if (attributes) {
+    const attrArray = attributes.split(",");
+    const attrConditions = [];
+
+    for (const attr of attrArray) {
+      const [attrName, value] = attr.split(":");
+      const attribute = await Attribute.findOne({ slug: attrName });
+      if (attribute) {
+        attrConditions.push({
+          "variation_options.attributes": {
+            $elemMatch: { attribute: attribute._id, value },
+          },
+        });
+      }
+    }
+
+    if (attrConditions.length > 0) {
+      filter.$and = attrConditions;
+    }
+  }
+
+  // Search Filter (on product name or description)
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  // ------------------ QUERY ------------------
   let query = Product.find(filter)
     .populate("tags", "name slug")
     .populate("category", "name slug")
@@ -602,7 +663,6 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
 
   let products = await features.query;
 
-  /* ------------------ FORMAT ADDITIONAL INFO ------------------ */
   products = products.map((product) => {
     const obj = product.toObject();
     obj.additional_info = formatAdditionalInfo(obj);
@@ -615,6 +675,8 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
     "Products fetched successfully"
   );
 });
+
+
 
 
 
