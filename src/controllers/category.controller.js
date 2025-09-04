@@ -1,4 +1,5 @@
-const Category = require("../models/category.model");
+// controllers/category.controller.js
+const Category = require("../models/category.model"); // ✅ Direct import
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
@@ -12,26 +13,25 @@ exports.getAllCategories = catchAsync(async (req, res, next) => {
   const filter = {};
   if (req.query.type) filter.type = req.query.type;
 
-  const queryStr = JSON.stringify(req.query).replace(
-    /\b(gte|gt|lte|lt)\b/g,
-    (match) => `$${match}`
-  );
-  const queryObj = JSON.parse(queryStr);
+  // Count total categories (for pagination)
+  const totalCategories = await Category.countDocuments(filter);
 
   const features = new APIFeatures(
     Category.find(filter).populate("createdBy", "name email"),
-    queryObj
-  )
-    .filter()
-    .sort()
-    .limitFields()
-    .paginate();
+    req.query
+  );
+
+  await features.buildFilters();
+  features.sort().limitFields().paginate(totalCategories);
 
   const categories = await features.query;
 
   return successResponse(
     res,
-    { categories, count: categories.length },
+    {
+      categories,
+      pagination: features.pagination,
+    },
     "Categories fetched successfully"
   );
 });
