@@ -1,13 +1,9 @@
-const {
-  Product,
-  Review,
-  Tag,
-  Image,
-  Attribute,
-  Variation,
-  VariationOption,
-  updateProductRatings,
-} = require("../models/product.model");
+const Product = require("../models/product.model");
+const Tag = require("../models/tag.model");
+const Image = require("../models/image.model");
+const Attribute = require("../models/attribute.model");
+const Variation = require("../models/variation.model");
+const VariationOption = require("../models/variationOption.model");
 const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
@@ -20,248 +16,41 @@ const { generateUniqueSlug, createSlug } = require("../utils/slug");
 const formatAdditionalInfo = require("../utils/formatAdditionalInfo");
 
 // ------------------ GET ALL PRODUCTS ------------------
-// exports.getAllProducts = catchAsync(async (req, res, next) => {
-//   const filter = {};
-//   const andConditions = [];
-
-//   /* ------------------ FILTERING ------------------ */
-//   if (req.query.category) {
-//     const category = await Category.findOne({
-//       slug: req.query.category,
-//     }).select("_id");
-//     if (!category)
-//       return errorResponse(res, "No category found with that slug", 404);
-//     andConditions.push({ category: category._id });
-//   }
-
-//   if (req.query.subCategory)
-//     andConditions.push({ subCategory: req.query.subCategory });
-
-//   if (req.query.minPrice || req.query.maxPrice) {
-//     const priceFilter = {};
-//     if (req.query.minPrice) priceFilter.$gte = Number(req.query.minPrice);
-//     if (req.query.maxPrice) priceFilter.$lte = Number(req.query.maxPrice);
-//     andConditions.push({ price: priceFilter });
-//   }
-
-//   if (req.query.minRating) {
-//     andConditions.push({
-//       ratingsAverage: { $gte: Number(req.query.minRating) },
-//     });
-//   }
-
-//   if (req.query.tag) {
-//     const tag = await Tag.findOne({ slug: req.query.tag }).select("_id");
-//     if (!tag) return errorResponse(res, "No tag found with that slug", 404);
-//     andConditions.push({ tags: tag._id });
-//   }
-
-//   if (req.query.search) {
-//     const searchRegex = { $regex: req.query.search, $options: "i" };
-//     andConditions.push({
-//       $or: [{ name: searchRegex }, { description: searchRegex }],
-//     });
-//   }
-
-//   if (andConditions.length > 0) filter.$and = andConditions;
-
-//   /* ------------------ QUERY WITH POPULATE ------------------ */
-//   let query = Product.find(filter)
-//     .populate("tags", "name slug")
-//     .populate("category", "name slug")
-//     .populate("subCategory", "name slug")
-//     .populate({
-//       path: "variations",
-//       populate: {
-//         path: "attribute",
-//         model: "Attribute",
-//         select: "slug name type values",
-//       },
-//     })
-//     .populate({
-//       path: "variation_options",
-//       populate: {
-//         path: "attributes.attribute",
-//         model: "Attribute",
-//         select: "slug name type values",
-//       },
-//     })
-//     .populate("image", "original thumbnail")
-//     .populate("gallery", "original thumbnail");
-
-//   const features = new APIFeatures(query, req.query)
-//     .sort()
-//     .limitFields()
-//     .paginate();
-
-//   let products = await features.query;
-
-//   /* ------------------ FORMAT ADDITIONAL INFO ------------------ */
-//   products = products.map((product) => {
-//     const obj = product.toObject();
-//     obj.additional_info = formatAdditionalInfo(obj);
-//     return obj;
-//   });
-
-//   return successResponse(
-//     res,
-//     { products, results: products.length },
-//     "Products fetched successfully"
-//   );
-// });
 exports.getAllProducts = catchAsync(async (req, res, next) => {
-  const filter = {};
-  const andConditions = [];
+  const totalProducts = await Product.countDocuments();
 
-  const {
-    category,
-    subCategory,
-    minPrice,
-    maxPrice,
-    minRating,
-    tag,
-    tags,
-    attributes,
-    search,
-    inStock,
-    onSale,
-    sort_by,
-  } = req.query;
+  const features = new APIFeatures(Product.find(), req.query);
+  await features.buildFilters();
+  features.sort().limitFields().paginate(totalProducts);
 
-  /* ------------------ CATEGORY FILTER ------------------ */
-  if (category) {
-    const categoryDoc = await Category.findOne({ slug: category }).select(
-      "_id"
-    );
-    if (!categoryDoc)
-      return errorResponse(res, "No category found with that slug", 404);
-    andConditions.push({ category: categoryDoc._id });
-  }
-
-  if (subCategory) {
-    andConditions.push({ subCategory });
-  }
-
-  /* ------------------ PRICE FILTER ------------------ */
-  if (minPrice || maxPrice) {
-    const priceFilter = {};
-    if (minPrice) priceFilter.$gte = Number(minPrice);
-    if (maxPrice) priceFilter.$lte = Number(maxPrice);
-    andConditions.push({ price: priceFilter });
-  }
-
-  /* ------------------ RATING FILTER ------------------ */
-  if (minRating) {
-    andConditions.push({ ratingsAverage: { $gte: Number(minRating) } });
-  }
-
-  /* ------------------ SINGLE TAG FILTER ------------------ */
-  if (tag) {
-    const tagDoc = await Tag.findOne({ slug: tag }).select("_id");
-    if (!tagDoc) return errorResponse(res, "No tag found with that slug", 404);
-    andConditions.push({ tags: tagDoc._id });
-  }
-
-  /* ------------------ MULTIPLE TAGS FILTER ------------------ */
-  if (tags) {
-    const tagSlugs = tags.split(",");
-    const tagDocs = await Tag.find({ slug: { $in: tagSlugs } }).select("_id");
-    andConditions.push({ tags: { $in: tagDocs.map((t) => t._id) } });
-  }
-
-  /* ------------------ STOCK FILTER ------------------ */
-  if (inStock === "true") {
-    andConditions.push({ in_stock: true });
-  }
-
-  /* ------------------ ON SALE FILTER ------------------ */
-  if (onSale === "true") {
-    andConditions.push({ on_sale: true });
-  }
-
-  /* ------------------ ATTRIBUTES FILTER ------------------ */
-  if (attributes) {
-    const attrArray = attributes.split(",");
-    const attrConditions = [];
-    for (const attr of attrArray) {
-      const [attrName, value] = attr.split(":");
-      const attribute = await Attribute.findOne({ slug: attrName });
-      if (attribute) {
-        attrConditions.push({
-          "variation_options.attributes": {
-            $elemMatch: { attribute: attribute._id, value },
-          },
-        });
-      }
-    }
-    if (attrConditions.length > 0) andConditions.push(...attrConditions);
-  }
-
-  /* ------------------ SEARCH FILTER ------------------ */
-  if (search) {
-    const searchRegex = { $regex: search, $options: "i" };
-    andConditions.push({
-      $or: [{ name: searchRegex }, { description: searchRegex }],
-    });
-  }
-
-  /* ------------------ APPLY AND CONDITIONS ------------------ */
-  if (andConditions.length > 0) filter.$and = andConditions;
-
-  /* ------------------ SORT OPTIONS ------------------ */
-  const SORT_OPTIONS = {
-    "new-arrival": { createdAt: -1 },
-    "best-selling": { ratingsQuantity: -1 },
-    lowest: { price: 1 },
-    highest: { price: -1 },
-  };
-
-  /* ------------------ QUERY WITH POPULATE ------------------ */
-  let query = Product.find(filter)
+  const products = await features.query
     .populate("tags", "name slug")
     .populate("category", "name slug")
     .populate("subCategory", "name slug")
     .populate({
       path: "variations",
-      populate: {
-        path: "attribute",
-        model: "Attribute",
-        select: "slug name type values",
-      },
+      populate: { path: "attribute", select: "slug name type values" },
     })
     .populate({
       path: "variation_options",
       populate: {
         path: "attributes.attribute",
-        model: "Attribute",
         select: "slug name type values",
       },
     })
-    .populate("image", "original thumbnail")
-    .populate("gallery", "original thumbnail");
+    .populate("image gallery", "original thumbnail");
 
-  const features = new APIFeatures(query, req.query).limitFields().paginate();
-
-  // Apply sorting dynamically
-  if (sort_by && SORT_OPTIONS[sort_by]) {
-    features.query = features.query.sort(SORT_OPTIONS[sort_by]);
-  } else {
-    features.query = features.query.sort({ createdAt: -1 }); // default sort
-  }
-
-  /* ------------------ EXECUTE QUERY ------------------ */
-  let products = await features.query;
-
-  /* ------------------ FORMAT ADDITIONAL INFO ------------------ */
-  products = products.map((product) => {
-    const obj = product.toObject();
-    obj.additional_info = formatAdditionalInfo(obj);
-    return obj;
-  });
+  const formattedProducts = products.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
 
   return successResponse(
     res,
-    { products, results: products.length },
+    {
+      products: formattedProducts,
+      pagination: features.pagination,
+    },
     "Products fetched successfully"
   );
 });
@@ -700,559 +489,41 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
 });
 
 // ------------------ GET PRODUCTS BY CATEGORY (WITH FILTERS) ------------------
-// exports.getProductsByCategory = catchAsync(async (req, res, next) => {
-//   const { parent: categorySlug, child: subCategorySlug } = req.query;
-//   if (!categorySlug) {
-//     return errorResponse(res, "Parent category slug is required", 400);
-//   }
-
-//   // Find parent category
-//   const category = await Category.findOne({ slug: categorySlug });
-//   if (!category) {
-//     return errorResponse(res, "No category found with that slug", 404);
-//   }
-
-//   // Basic filter setup
-//   let filter = { category: category._id };
-
-//   // Sub-category filter
-//   if (subCategorySlug) {
-//     const subCategory = category.children.find(
-//       (child) => child.slug === subCategorySlug
-//     );
-//     if (!subCategory) {
-//       return errorResponse(res, "No sub-category found with that slug", 404);
-//     }
-//     filter.subCategory = subCategory._id;
-//   }
-
-//   // ------------------ ADD FILTERS ------------------
-//   const { minPrice, maxPrice, inStock, onSale, attributes, tags, search } =
-//     req.query;
-
-//   // Price Range Filter
-//   if (minPrice || maxPrice) {
-//     filter.price = {};
-//     if (minPrice) filter.price.$gte = Number(minPrice);
-//     if (maxPrice) filter.price.$lte = Number(maxPrice);
-//   }
-
-//   // Stock Filter
-//   if (inStock === "true") filter.in_stock = true;
-
-//   // On Sale Filter
-//   if (onSale === "true") filter.on_sale = true;
-
-//   // Tags Filter (comma separated slugs)
-//   if (tags) {
-//     const tagSlugs = tags.split(",");
-//     const tagDocs = await Tag.find({ slug: { $in: tagSlugs } }).select("_id");
-//     filter.tags = { $in: tagDocs.map((tag) => tag._id) };
-//   }
-
-//   // Attribute Filters (Example: ?attributes=color:red,size:XL)
-//   if (attributes) {
-//     const attrArray = attributes.split(",");
-//     const attrConditions = [];
-
-//     for (const attr of attrArray) {
-//       const [attrName, value] = attr.split(":");
-//       const attribute = await Attribute.findOne({ slug: attrName });
-//       if (attribute) {
-//         attrConditions.push({
-//           "variation_options.attributes": {
-//             $elemMatch: { attribute: attribute._id, value },
-//           },
-//         });
-//       }
-//     }
-
-//     if (attrConditions.length > 0) {
-//       filter.$and = attrConditions;
-//     }
-//   }
-
-//   // Search Filter (on product name or description)
-//   if (search) {
-//     filter.$or = [
-//       { name: { $regex: search, $options: "i" } },
-//       { description: { $regex: search, $options: "i" } },
-//     ];
-//   }
-
-//   // ------------------ QUERY ------------------
-//   let query = Product.find(filter)
-//     .populate("tags", "name slug")
-//     .populate("category", "name slug")
-//     .populate("subCategory", "name slug")
-//     .populate({
-//       path: "variations",
-//       populate: {
-//         path: "attribute",
-//         model: "Attribute",
-//         select: "slug name type values",
-//       },
-//     })
-//     .populate({
-//       path: "variation_options",
-//       populate: {
-//         path: "attributes.attribute",
-//         model: "Attribute",
-//         select: "slug name type values",
-//       },
-//     })
-//     .populate("image", "original thumbnail")
-//     .populate("gallery", "original thumbnail")
-//     .populate({
-//       path: "reviews",
-//       populate: {
-//         path: "user",
-//         select: "name",
-//       },
-//       match: { is_approved: true },
-//     });
-
-//   const features = new APIFeatures(query, req.query)
-//     .sort()
-//     .limitFields()
-//     .paginate();
-
-//   let products = await features.query;
-
-//   products = products.map((product) => {
-//     const obj = product.toObject();
-//     obj.additional_info = formatAdditionalInfo(obj);
-//     return obj;
-//   });
-
-//   return successResponse(
-//     res,
-//     { products, results: products.length },
-//     "Products fetched successfully"
-//   );
-// });
-
 exports.getProductsByCategory = catchAsync(async (req, res, next) => {
-  const { parent: categorySlug, child: subCategorySlug } = req.query;
-  if (!categorySlug) {
-    return errorResponse(res, "Parent category slug is required", 400);
-  }
+  const totalProducts = await Product.countDocuments();
 
-  // Find parent category
-  const category = await Category.findOne({ slug: categorySlug });
-  if (!category) {
-    return errorResponse(res, "No category found with that slug", 404);
-  }
+  const features = new APIFeatures(Product.find(), req.query);
+  await features.buildFilters();
+  features.sort().limitFields().paginate(totalProducts);
 
-  // Base filter
-  let filter = { category: category._id };
-
-  // Sub-category filter
-  if (subCategorySlug) {
-    const subCategory = category.children.find(
-      (child) => child.slug === subCategorySlug
-    );
-    if (!subCategory) {
-      return errorResponse(res, "No sub-category found with that slug", 404);
-    }
-    filter.subCategory = subCategory._id;
-  }
-
-  // Extract query params
-  const {
-    minPrice,
-    maxPrice,
-    inStock,
-    onSale,
-    attributes,
-    tags,
-    search,
-    sort_by,
-  } = req.query;
-
-  // ---------------- PRICE FILTER ----------------
-  if (minPrice || maxPrice) {
-    filter.price = {};
-    if (minPrice) filter.price.$gte = Number(minPrice);
-    if (maxPrice) filter.price.$lte = Number(maxPrice);
-  }
-
-  // ---------------- STOCK FILTER ----------------
-  if (inStock === "true") filter.in_stock = true;
-
-  // ---------------- ON SALE FILTER ----------------
-  if (onSale === "true") filter.on_sale = true;
-
-  // ---------------- TAGS FILTER ----------------
-  if (tags) {
-    const tagSlugs = tags.split(",");
-    const tagDocs = await Tag.find({ slug: { $in: tagSlugs } }).select("_id");
-    filter.tags = { $in: tagDocs.map((tag) => tag._id) };
-  }
-
-  // ---------------- ATTRIBUTES FILTER ----------------
-  if (attributes) {
-    const attrArray = attributes.split(",");
-    const attrConditions = [];
-    for (const attr of attrArray) {
-      const [attrName, value] = attr.split(":");
-      const attribute = await Attribute.findOne({ slug: attrName });
-      if (attribute) {
-        attrConditions.push({
-          "variation_options.attributes": {
-            $elemMatch: { attribute: attribute._id, value },
-          },
-        });
-      }
-    }
-    if (attrConditions.length > 0) filter.$and = attrConditions;
-  }
-
-  // ---------------- SEARCH FILTER ----------------
-  if (search) {
-    filter.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { description: { $regex: search, $options: "i" } },
-    ];
-  }
-
-  // ---------------- SORT OPTIONS ----------------
-  const SORT_OPTIONS = {
-    "new-arrival": { createdAt: -1 }, // Latest first
-    "best-selling": { ratingsQuantity: -1 }, // Proxy for best-selling
-    lowest: { price: 1 }, // Ascending price
-    highest: { price: -1 }, // Descending price
-  };
-
-  // ---------------- QUERY ----------------
-  let query = Product.find(filter)
+  const products = await features.query
     .populate("tags", "name slug")
     .populate("category", "name slug")
     .populate("subCategory", "name slug")
     .populate({
       path: "variations",
-      populate: {
-        path: "attribute",
-        model: "Attribute",
-        select: "slug name type values",
-      },
+      populate: { path: "attribute", select: "slug name type values" },
     })
     .populate({
       path: "variation_options",
       populate: {
         path: "attributes.attribute",
-        model: "Attribute",
         select: "slug name type values",
       },
     })
-    .populate("image", "original thumbnail")
-    .populate("gallery", "original thumbnail")
-    .populate({
-      path: "reviews",
-      populate: {
-        path: "user",
-        select: "name",
-      },
-      match: { is_approved: true },
-    });
+    .populate("image gallery", "original thumbnail");
 
-  const features = new APIFeatures(query, req.query).limitFields().paginate();
-
-  // Apply sorting
-  if (sort_by && SORT_OPTIONS[sort_by]) {
-    features.query = features.query.sort(SORT_OPTIONS[sort_by]);
-  } else {
-    features.query = features.query.sort({ createdAt: -1 }); // default
-  }
-
-  // Execute query
-  let products = await features.query;
-
-  // Format additional info
-  products = products.map((product) => {
-    const obj = product.toObject();
-    obj.additional_info = formatAdditionalInfo(obj);
-    return obj;
-  });
+  const formattedProducts = products.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
 
   return successResponse(
     res,
-    { products, results: products.length },
+    {
+      products: formattedProducts,
+      pagination: features.pagination,
+    },
     "Products fetched successfully"
   );
 });
-
-
-
-
-
-
-
-
-
-
-// ------------------ REVIEW CONTROLLERS ------------------
-
-// ------------------ CREATE REVIEW ------------------
-exports.createReview = catchAsync(async (req, res, next) => {
-  const { rating, title, comment } = req.body;
-  const productId = req.params.id;
-  const userId = req.user._id;
-
-  const product = await Product.findById(productId);
-  if (!product) return errorResponse(res, "Product not found", 404);
-
-  const existingReview = await Review.findOne({
-    product: productId,
-    user: userId,
-  });
-  if (existingReview) {
-    return errorResponse(res, "You have already reviewed this product", 400);
-  }
-
-  const review = await Review.create({
-    product: productId,
-    user: userId,
-    rating,
-    title,
-    comment,
-    is_approved: true,
-  });
-
-  product.reviews.push(review._id);
-  await product.save();
-
-  await updateProductRatings(productId);
-
-  const populatedReview = await Review.findById(review._id).populate({
-    path: "user",
-    select: "name email",
-  });
-
-  return successResponse(
-    res,
-    { review: populatedReview },
-    "Review created successfully",
-    201
-  );
-});
-
-// ------------------ GET PRODUCT REVIEWS ------------------
-exports.getProductReviews = catchAsync(async (req, res, next) => {
-  const productId = req.params.id;
-
-  const reviews = await Review.find({ product: productId, is_approved: true })
-    .populate({
-      path: "user",
-      select: "name email",
-    })
-    .sort({ createdAt: -1 });
-
-  const product = await Product.findById(productId);
-  if (!product) return errorResponse(res, "Product not found", 404);
-
-  return successResponse(
-    res,
-    {
-      reviews,
-      total: reviews.length,
-      averageRating: product.ratingsAverage,
-      totalRatings: product.ratingsQuantity,
-    },
-    "Reviews fetched successfully"
-  );
-});
-
-// ------------------ UPDATE REVIEW ------------------
-exports.updateReview = catchAsync(async (req, res, next) => {
-  const { rating, title, comment } = req.body;
-  const reviewId = req.params.reviewId;
-
-  const review = await Review.findById(reviewId);
-  if (!review) return errorResponse(res, "Review not found", 404);
-
-  if (
-    review.user.toString() !== req.user._id.toString() &&
-    req.user.role !== "admin"
-  ) {
-    return errorResponse(res, "You can only update your own reviews", 403);
-  }
-
-  const oldRating = review.rating;
-
-  const updatedReview = await Review.findByIdAndUpdate(
-    reviewId,
-    { rating, title, comment },
-    { new: true, runValidators: true }
-  ).populate({
-    path: "user",
-    select: "name email",
-  });
-
-  if (rating !== oldRating) {
-    await updateProductRatings(review.product);
-  }
-
-  return successResponse(
-    res,
-    { review: updatedReview },
-    "Review updated successfully"
-  );
-});
-
-// ------------------ DELETE REVIEW ------------------
-exports.deleteReview = catchAsync(async (req, res, next) => {
-  const reviewId = req.params.reviewId;
-
-  const review = await Review.findById(reviewId);
-  if (!review) return errorResponse(res, "Review not found", 404);
-
-  if (
-    review.user.toString() !== req.user._id.toString() &&
-    req.user.role !== "admin"
-  ) {
-    return errorResponse(res, "You can only delete your own reviews", 403);
-  }
-
-  await Product.findByIdAndUpdate(review.product, {
-    $pull: { reviews: reviewId },
-  });
-
-  await Review.findByIdAndDelete(reviewId);
-
-  await updateProductRatings(review.product);
-
-  return successResponse(res, null, "Review deleted successfully", 204);
-});
-
-// ------------------ MODERATE REVIEW (ADMIN) ------------------
-exports.moderateReview = catchAsync(async (req, res, next) => {
-  const { is_approved } = req.body;
-  const reviewId = req.params.reviewId;
-
-  const review = await Review.findByIdAndUpdate(
-    reviewId,
-    { is_approved },
-    { new: true, runValidators: true }
-  ).populate({
-    path: "user",
-    select: "name email",
-  });
-
-  if (!review) return errorResponse(res, "Review not found", 404);
-
-  await updateProductRatings(review.product);
-
-  return successResponse(
-    res,
-    { review },
-    `Review ${is_approved ? "approved" : "rejected"} successfully`
-  );
-});
-
-// ------------------ GET ALL REVIEWS (ADMIN) ------------------
-exports.getAllReviews = catchAsync(async (req, res, next) => {
-  const filter = {};
-
-  if (req.query.status) {
-    filter.is_approved = req.query.status === "approved";
-  }
-
-  if (req.query.product) {
-    filter.product = req.query.product;
-  }
-
-  if (req.query.user) {
-    filter.user = req.query.user;
-  }
-
-  const reviews = await Review.find(filter)
-    .populate({
-      path: "user",
-      select: "name email",
-    })
-    .populate({
-      path: "product",
-      select: "name slug",
-    })
-    .sort({ createdAt: -1 });
-
-  return successResponse(
-    res,
-    { reviews, total: reviews.length },
-    "Reviews fetched successfully"
-  );
-});
-
-// ------------------ MARK REVIEW HELPFUL ------------------
-exports.markReviewHelpful = catchAsync(async (req, res, next) => {
-  const reviewId = req.params.reviewId;
-  const userId = req.user._id;
-
-  const review = await Review.findById(reviewId);
-  if (!review) return errorResponse(res, "Review not found", 404);
-
-  // Remove user from notHelpfulUsers if they had voted not helpful
-  review.notHelpfulUsers = review.notHelpfulUsers.filter(
-    (id) => id.toString() !== userId.toString()
-  );
-
-  if (review.helpfulUsers.some((id) => id.toString() === userId.toString())) {
-    // If already marked helpful, toggle off
-    review.helpfulUsers = review.helpfulUsers.filter(
-      (id) => id.toString() !== userId.toString()
-    );
-  } else {
-    // Otherwise, add user to helpfulUsers
-    review.helpfulUsers.push(userId);
-  }
-
-  await review.save();
-
-  return successResponse(
-    res,
-    {
-      helpfulCount: review.helpfulUsers.length,
-      notHelpfulCount: review.notHelpfulUsers.length,
-    },
-    "Helpful vote updated"
-  );
-});
-
-// ------------------ MARK REVIEW NOT HELPFUL ------------------
-exports.markReviewNotHelpful = catchAsync(async (req, res, next) => {
-  const reviewId = req.params.reviewId;
-  const userId = req.user._id;
-
-  const review = await Review.findById(reviewId);
-  if (!review) return errorResponse(res, "Review not found", 404);
-
-  // Remove user from helpfulUsers if they had voted helpful
-  review.helpfulUsers = review.helpfulUsers.filter(
-    (id) => id.toString() !== userId.toString()
-  );
-
-  if (
-    review.notHelpfulUsers.some((id) => id.toString() === userId.toString())
-  ) {
-    // If already marked not helpful, toggle off
-    review.notHelpfulUsers = review.notHelpfulUsers.filter(
-      (id) => id.toString() !== userId.toString()
-    );
-  } else {
-    // Otherwise, add user to notHelpfulUsers
-    review.notHelpfulUsers.push(userId);
-  }
-
-  await review.save();
-
-  return successResponse(
-    res,
-    {
-      helpfulCount: review.helpfulUsers.length,
-      notHelpfulCount: review.notHelpfulUsers.length,
-    },
-    "Not helpful vote updated"
-  );
-});
-

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const productController = require("../controllers/product.controller");
+const reviewController = require("../controllers/review.controller");
 const uploadProduct = require("../utils/uploadProduct");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 
@@ -10,22 +11,20 @@ router.get("/category/:categorySlug", productController.getProductsByCategory);
 router.get("/", productController.getAllProducts);
 router.get("/:slug", productController.getProduct);
 
-
-
 // Review routes (public and authenticated)
-router.get("/:id/reviews", productController.getProductReviews);
-router.post("/:id/reviews", protect, productController.createReview);
-router.patch("/reviews/:reviewId", protect, productController.updateReview);
-router.delete("/reviews/:reviewId", protect, productController.deleteReview);
+router.get("/:id/reviews", reviewController.getProductReviews);
+router.post("/:id/reviews", protect, reviewController.createReview);
+router.patch("/reviews/:reviewId", protect, reviewController.updateReview);
+router.delete("/reviews/:reviewId", protect, reviewController.deleteReview);
 router.patch(
   "/reviews/:reviewId/helpful",
   protect,
-  productController.markReviewHelpful
+  reviewController.markReviewHelpful
 );
 router.patch(
   "/reviews/:reviewId/not-helpful",
   protect,
-  productController.markReviewNotHelpful
+  reviewController.markReviewNotHelpful
 );
 
 // Admin-only routes
@@ -52,7 +51,7 @@ router.patch(
 router.delete("/:id", productController.deleteProduct);
 
 // Admin review management
-router.get("/reviews/all", productController.getAllReviews);
-router.patch("/reviews/:reviewId/moderate", productController.moderateReview);
+router.get("/reviews/all", reviewController.getAllReviews);
+router.patch("/reviews/:reviewId/moderate", reviewController.moderateReview);
 
 module.exports = router;
