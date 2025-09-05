@@ -5,17 +5,17 @@ const Attribute = require("../models/attribute.model");
 const Variation = require("../models/variation.model");
 const VariationOption = require("../models/variationOption.model");
 const Category = require("../models/category.model");
+
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
 const safeDestroy = require("../utils/safeDestroy");
-
 const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
 const { generateUniqueSlug, createSlug } = require("../utils/slug");
 const formatAdditionalInfo = require("../utils/formatAdditionalInfo");
 
-// ------------------ GET ALL PRODUCTS ------------------
+// ------------------ GET ALL PRODUCTS (WITH FILTERS) ------------------
 exports.getAllProducts = catchAsync(async (req, res, next) => {
   const totalProducts = await Product.countDocuments();
 
@@ -91,7 +91,7 @@ exports.getProduct = catchAsync(async (req, res, next) => {
 
   const productData = product.toObject();
 
-  // Format reviews: calculate helpful/not_helpful counts and remove users array
+  // Format reviews: helpful / not_helpful counts
   productData.reviews = productData.reviews.map((review) => ({
     ...review,
     helpful: review.helpfulUsers ? review.helpfulUsers.length : 0,
@@ -488,11 +488,35 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
   return successResponse(res, "Product deleted successfully", 204);
 });
 
-// ------------------ GET PRODUCTS BY CATEGORY (WITH FILTERS) ------------------
+// ------------------ GET PRODUCTS BY PARENT CATEGORY (WITH FILTERS) ------------------
 exports.getProductsByCategory = catchAsync(async (req, res, next) => {
-  const totalProducts = await Product.countDocuments();
+  const { parent: parentSlug } = req.query;
 
-  const features = new APIFeatures(Product.find(), req.query);
+  // Step 1: Base filter
+  const filter = {};
+  const andConditions = [];
+
+  // Step 2: Parent category check
+  if (parentSlug) {
+    const parentCategory = await Category.findOne({ slug: parentSlug });
+    if (!parentCategory) {
+      return errorResponse(res, "Parent category not found", 404);
+    }
+
+    // Only parent filter (ignore children)
+    andConditions.push({ category: parentCategory._id });
+  }
+
+  // Apply category filters
+  if (andConditions.length > 0) {
+    filter.$and = andConditions;
+  }
+
+  // Step 3: Count products
+  const totalProducts = await Product.countDocuments(filter);
+
+  // Step 4: Query with filters + pagination
+  const features = new APIFeatures(Product.find(filter), req.query);
   await features.buildFilters();
   features.sort().limitFields().paginate(totalProducts);
 
@@ -524,7 +548,7 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
       products: formattedProducts,
       pagination: features.pagination,
     },
-    "Products fetched successfully by categories"
+    "Products fetched successfully by parent category"
   );
 });
 
@@ -601,3 +625,105 @@ exports.getProductsByCategorySubCategories = catchAsync(
     );
   }
 );
+
+// ------------------ GET DEAL PRODUCTS (WITH FILTERS) ------------------
+exports.getDealProducts = catchAsync(async (req, res, next) => {
+  // Base filter: only products that are deals (on sale)
+  const filter = { on_sale: true }; // OR use `is_deal: true` if you have that field
+
+  // Count total deal products
+  const totalProducts = await Product.countDocuments(filter);
+
+  // Apply API features (filters, sort, pagination)
+  const features = new APIFeatures(Product.find(filter), req.query);
+  await features.buildFilters();
+  features.sort().limitFields().paginate(totalProducts);
+
+  // Fetch products with population
+  const products = await features.query
+    .populate("tags", "name slug")
+    .populate("category", "name slug")
+    .populate("subCategory", "name slug")
+    .populate({
+      path: "variations",
+      populate: { path: "attribute", select: "slug name type values" },
+    })
+    .populate({
+      path: "variation_options",
+      populate: {
+        path: "attributes.attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("image gallery", "original thumbnail");
+
+  // Format products
+  const formattedProducts = products.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
+
+  // Success response
+  return successResponse(
+    res,
+    {
+      products: formattedProducts,
+      pagination: features.pagination,
+    },
+    "Deal products fetched successfully"
+  );
+});
+
+// ------------------ GET NEW SELLER PRODUCTS (WITH FILTERS) ------------------
+exports.getNewSellerProducts = catchAsync(async (req, res, next) => {
+  // Base filter: (optional) if sellerId is passed in query
+  const filter = {};
+  if (req.query.sellerId) {
+    filter.seller = req.query.sellerId; // assuming Product has a 'seller' field
+  }
+
+  // Count total products for seller (or all)
+  const totalProducts = await Product.countDocuments(filter);
+
+  // Apply API features (filters, pagination, etc.)
+  const features = new APIFeatures(Product.find(filter), req.query);
+  await features.buildFilters();
+
+  // Force sorting by newest first
+  features.query = features.query.sort({ createdAt: -1 });
+  features.limitFields().paginate(totalProducts);
+
+  // Fetch products
+  const products = await features.query
+    .populate("tags", "name slug")
+    .populate("category", "name slug")
+    .populate("subCategory", "name slug")
+    .populate({
+      path: "variations",
+      populate: { path: "attribute", select: "slug name type values" },
+    })
+    .populate({
+      path: "variation_options",
+      populate: {
+        path: "attributes.attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("image gallery", "original thumbnail");
+
+  // Format products
+  const formattedProducts = products.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
+
+  // Success response
+  return successResponse(
+    res,
+    {
+      products: formattedProducts,
+      pagination: features.pagination,
+    },
+    "New seller products fetched successfully"
+  );
+});

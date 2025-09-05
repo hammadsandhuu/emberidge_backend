@@ -6,9 +6,11 @@ const uploadProduct = require("../utils/uploadProduct");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 
 // Public routes
-router.get("/categories", productController.getProductsByCategorySubCategories);
-router.get("/category/:categorySlug", productController.getProductsByCategory);
 router.get("/", productController.getAllProducts);
+router.get("/category", productController.getProductsByCategory);
+router.get("/categories", productController.getProductsByCategorySubCategories);
+router.get("/best-seller", productController.getNewSellerProducts);
+router.get("/deals", productController.getDealProducts);
 router.get("/:slug", productController.getProduct);
 
 // Review routes (public and authenticated)

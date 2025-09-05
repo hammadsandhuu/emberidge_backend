@@ -17,6 +17,7 @@ const authRoutes = require("./routes/auth.routes");
 const userRoute = require("./routes/user.routes");
 const categoryRoutes = require("./routes/category.routes");
 const productRoutes = require("./routes/product.routes");
+const dealRoutes = require("./routes/deal.routes");
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use("/auth", authRoutes);
 app.use("/api/v1/users", userRoute);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/deals", dealRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world");

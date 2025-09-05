@@ -1,16 +1,10 @@
-const {
-  Product,
-  Review,
-  updateProductRatings,
-} = require("../models/product.model");
+const Review = require("../models/review.model");
+const Product = require("../models/product.model");
+
 const catchAsync = require("../utils/catchAsync");
 const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
-
-
-
-
-// ------------------ REVIEW CONTROLLERS ------------------
+const { updateProductRatings } = require("../utils/reviewUtils");
 
 // ------------------ CREATE REVIEW ------------------
 exports.createReview = catchAsync(async (req, res, next) => {

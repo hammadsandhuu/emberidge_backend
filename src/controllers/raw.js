@@ -224,3 +224,89 @@
 //     "Products fetched successfully"
 //   );
 // });
+
+
+
+
+/* ===============================
+   HELPERS
+================================*/
+async function updateVariableProductStats(productId) {
+  const variationOptions = await VariationOption.find({ product: productId });
+  if (!variationOptions.length) {
+    await Product.findByIdAndUpdate(productId, {
+      min_price: null,
+      max_price: null,
+      in_stock: false,
+      is_active: false,
+    });
+    return;
+  }
+
+  const prices = variationOptions
+    .map((opt) => opt.price)
+    .filter((p) => typeof p === "number");
+  const stockAvailable = variationOptions.some((opt) => opt.quantity > 0);
+
+  await Product.findByIdAndUpdate(productId, {
+    min_price: prices.length ? Math.min(...prices) : null,
+    max_price: prices.length ? Math.max(...prices) : null,
+    in_stock: stockAvailable,
+    is_active: stockAvailable,
+  });
+}
+
+// Helper to update product ratings
+async function updateProductRatings(productId) {
+  const reviews = await Review.find({ product: productId, is_approved: true });
+
+  if (reviews.length === 0) {
+    await Product.findByIdAndUpdate(productId, {
+      ratingsAverage: 0,
+      ratingsQuantity: 0,
+    });
+    return;
+  }
+
+  const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+  const averageRating = totalRating / reviews.length;
+
+  await Product.findByIdAndUpdate(productId, {
+    ratingsAverage: averageRating,
+    ratingsQuantity: reviews.length,
+  });
+}
+
+/* ===============================
+   HOOKS
+================================*/
+productSchema.pre("save", async function (next) {
+  if (this.isModified("name") || !this.slug) {
+    const baseSlug = createSlug(this.name);
+    this.slug = await generateUniqueSlug(this.constructor, baseSlug, this._id);
+  }
+
+  if (this.product_type === "simple") this.in_stock = this.quantity > 0;
+  else if (this.product_type === "variable")
+    await updateVariableProductStats(this._id);
+
+  next();
+});
+
+variationOptionSchema.post("save", async function () {
+  if (this.product) await updateVariableProductStats(this.product);
+});
+
+variationOptionSchema.post("findOneAndDelete", async function (doc) {
+  if (doc?.product) await updateVariableProductStats(doc.product);
+});
+
+// Update product ratings when a review is deleted
+reviewSchema.post("findOneAndDelete", async function (doc) {
+  if (doc?.product) {
+    await Product.findByIdAndUpdate(doc.product, {
+      $pull: { reviews: doc._id },
+    });
+    await updateProductRatings(doc.product);
+  }
+});
