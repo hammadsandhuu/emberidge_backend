@@ -6,7 +6,7 @@ const uploadProduct = require("../utils/uploadProduct");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 
 // Public routes
-router.get("/categories", productController.getProductsByCategory);
+router.get("/categories", productController.getProductsByCategorySubCategories);
 router.get("/category/:categorySlug", productController.getProductsByCategory);
 router.get("/", productController.getAllProducts);
 router.get("/:slug", productController.getProduct);

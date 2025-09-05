@@ -524,6 +524,80 @@ exports.getProductsByCategory = catchAsync(async (req, res, next) => {
       products: formattedProducts,
       pagination: features.pagination,
     },
-    "Products fetched successfully"
+    "Products fetched successfully by categories"
   );
 });
+
+// ------------------ GET PRODUCTS BY CATEGORY + SUB CATEGORIES (WITH FILTERS) ------------------
+exports.getProductsByCategorySubCategories = catchAsync(
+  async (req, res, next) => {
+    const { parent: parentSlug, child: childSlug } = req.query;
+
+    // Step 1: Base filter
+    const filter = {};
+    const andConditions = [];
+
+    // Step 2: Parent category check
+    if (parentSlug) {
+      const parentCategory = await Category.findOne({ slug: parentSlug });
+      if (!parentCategory) {
+        return errorResponse(res, "Parent category not found", 404);
+      }
+      andConditions.push({ category: parentCategory._id });
+
+      // Step 3: Child category check (only if child is provided)
+      if (childSlug) {
+        const childCategory = parentCategory.children.find(
+          (child) => child.slug === childSlug
+        );
+        if (!childCategory) {
+          return errorResponse(res, "Child category not found", 404);
+        }
+        andConditions.push({ subCategory: childCategory._id });
+      }
+    }
+
+    // Apply category filters
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
+    }
+
+    // Step 4: Count products
+    const totalProducts = await Product.countDocuments(filter);
+
+    // Step 5: Query with filters + pagination
+    const features = new APIFeatures(Product.find(filter), req.query);
+    await features.buildFilters();
+    features.sort().limitFields().paginate(totalProducts);
+
+    const products = await features.query
+      .populate("tags", "name slug")
+      .populate("category", "name slug")
+      .populate("subCategory", "name slug")
+      .populate({
+        path: "variations",
+        populate: { path: "attribute", select: "slug name type values" },
+      })
+      .populate({
+        path: "variation_options",
+        populate: {
+          path: "attributes.attribute",
+          select: "slug name type values",
+        },
+      })
+      .populate("image gallery", "original thumbnail");
+
+    const formattedProducts = products.map((p) => ({
+      ...p.toObject(),
+      additional_info: formatAdditionalInfo(p.toObject()),
+    }));
+
+    return successResponse(
+      res,
+      {
+        products: formattedProducts,
+      },
+      "Products fetched successfully by parent & child category"
+    );
+  }
+);
