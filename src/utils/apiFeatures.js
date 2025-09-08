@@ -13,14 +13,14 @@ class APIFeatures {
   async buildFilters() {
     const {
       category,
-      subCategory,
+      sub_category,
       tags,
       tag,
       attributes,
-      minPrice,
-      maxPrice,
-      inStock,
-      onSale,
+      min_price,
+      max_price,
+      in_stock,
+      on_sale,
       search,
       q,
     } = this.queryString;
@@ -36,7 +36,7 @@ class APIFeatures {
       if (!categoryDoc) throw new Error(`Category "${category}" not found`);
       andConditions.push({ category: categoryDoc._id });
     }
-    if (subCategory) andConditions.push({ subCategory });
+    if (sub_category) andConditions.push({ sub_category });
 
     /* ---------- TAGS (Batch Query) ---------- */
     let allTagSlugs = [];
@@ -53,16 +53,16 @@ class APIFeatures {
     }
 
     /* ---------- PRICE RANGE ---------- */
-    if (minPrice || maxPrice) {
+    if (min_price || max_price) {
       const priceFilter = {};
-      if (minPrice) priceFilter.$gte = Number(minPrice);
-      if (maxPrice) priceFilter.$lte = Number(maxPrice);
+      if (min_price) priceFilter.$gte = Number(min_price);
+      if (max_price) priceFilter.$lte = Number(max_price);
       andConditions.push({ price: priceFilter });
     }
 
     /* ---------- STOCK & SALE ---------- */
-    if (inStock === "true") andConditions.push({ in_stock: true });
-    if (onSale === "true") andConditions.push({ on_sale: true });
+    if (in_stock === "true") andConditions.push({ in_stock: true });
+    if (on_sale === "true") andConditions.push({ on_sale: true });
 
     /* ---------- ATTRIBUTES (Batch Query) ---------- */
     if (attributes) {
@@ -108,12 +108,12 @@ class APIFeatures {
   sort() {
     const { sort_by } = this.queryString;
     const sortOptions = {
-      "new-arrival": { createdAt: -1 },
-      "best-selling": { ratingsQuantity: -1 },
+      "new-arrival": { created_at: -1 },
+      "best-selling": { ratings_quantity: -1 },
       lowest: { price: 1 },
       highest: { price: -1 },
     };
-    this.query = this.query.sort(sortOptions[sort_by] || { createdAt: -1 });
+    this.query = this.query.sort(sortOptions[sort_by] || { created_at: -1 });
     return this;
   }
 
