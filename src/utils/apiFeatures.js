@@ -107,13 +107,15 @@ class APIFeatures {
 
   sort() {
     const { sort_by } = this.queryString;
+
     const sortOptions = {
-      new_arrival: { created_at: -1 },
-      best_selling: { ratings_quantity: -1 },
+      new_arrival: { createdAt: -1 },
+      best_selling: { ratingsQuantity: -1 },
       lowest: { price: 1 },
       highest: { price: -1 },
     };
-    this.query = this.query.sort(sortOptions[sort_by] || { created_at: -1 });
+
+    this.query = this.query.sort(sortOptions[sort_by] || { createdAt: -1 });
     return this;
   }
 
