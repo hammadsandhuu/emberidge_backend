@@ -12,10 +12,8 @@ class APIFeatures {
 
   async buildFilters() {
     const {
-      category, // legacy single category support
-      categories, // multi-category support (comma separated)
-      sub_category, // legacy single subcategory
-      sub_categories, // multi-subcategory support (comma separated)
+      category,
+      sub_category,
       tags,
       tag,
       attributes,
@@ -30,46 +28,17 @@ class APIFeatures {
     const filter = {};
     const andConditions = [];
 
-    /* ---------- CATEGORIES ---------- */
-    if (categories) {
-      const categorySlugs = categories.split(",");
-      const categoryDocs = await Category.find({
-        slug: { $in: categorySlugs },
-      }).select("_id");
-      if (categoryDocs.length > 0) {
-        andConditions.push({
-          category: { $in: categoryDocs.map((c) => c._id) },
-        });
-      }
-    } else if (category) {
+    /* ---------- CATEGORY ---------- */
+    if (category) {
       const categoryDoc = await Category.findOne({ slug: category }).select(
         "_id"
       );
       if (!categoryDoc) throw new Error(`Category "${category}" not found`);
       andConditions.push({ category: categoryDoc._id });
     }
+    if (sub_category) andConditions.push({ sub_category });
 
-    /* ---------- SUB-CATEGORIES ---------- */
-    if (sub_categories) {
-      const subCategorySlugs = sub_categories.split(",");
-      const subCategoryDocs = await Category.find({
-        slug: { $in: subCategorySlugs },
-      }).select("_id");
-      if (subCategoryDocs.length > 0) {
-        andConditions.push({
-          subCategory: { $in: subCategoryDocs.map((c) => c._id) },
-        });
-      }
-    } else if (sub_category) {
-      const subCategoryDoc = await Category.findOne({
-        slug: sub_category,
-      }).select("_id");
-      if (subCategoryDoc) {
-        andConditions.push({ subCategory: subCategoryDoc._id });
-      }
-    }
-
-    /* ---------- TAGS ---------- */
+    /* ---------- TAGS (Batch Query) ---------- */
     let allTagSlugs = [];
     if (tags) allTagSlugs.push(...tags.split(","));
     if (tag) allTagSlugs.push(tag);
@@ -95,7 +64,7 @@ class APIFeatures {
     if (in_stock === "true") andConditions.push({ in_stock: true });
     if (on_sale === "true") andConditions.push({ on_sale: true });
 
-    /* ---------- ATTRIBUTES ---------- */
+    /* ---------- ATTRIBUTES (Batch Query) ---------- */
     if (attributes) {
       const attrArray = attributes.split(",");
       const attrSlugs = attrArray.map((a) => a.split(":")[0]);
@@ -109,6 +78,7 @@ class APIFeatures {
           const [attrName, value] = attr.split(":");
           const attribute = attrDocs.find((a) => a.slug === attrName);
           if (!attribute) return null;
+
           return {
             "variation_options.attributes": {
               $elemMatch: { attribute: attribute._id, value },
@@ -120,14 +90,16 @@ class APIFeatures {
       if (attrConditions.length > 0) andConditions.push(...attrConditions);
     }
 
-    /* ---------- APPLY FILTERS ---------- */
+    /* ---------- APPLY BASE FILTER ---------- */
     if (andConditions.length > 0) filter.$and = andConditions;
     this.query = this.query.find(filter);
 
-    /* ---------- TEXT SEARCH ---------- */
+    /* ---------- TEXT SEARCH (Fast) ---------- */
     const searchTerm = search || q;
     if (searchTerm) {
-      this.query = this.query.find({ $text: { $search: searchTerm } });
+      this.query = this.query.find({
+        $text: { $search: searchTerm },
+      });
     }
 
     return this;
