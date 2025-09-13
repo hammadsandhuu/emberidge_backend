@@ -12,7 +12,9 @@ class APIFeatures {
 
   async buildFilters() {
     const {
-      category,
+      categories,
+      parent,
+      child,
       sub_category,
       tags,
       tag,
@@ -28,17 +30,52 @@ class APIFeatures {
     const filter = {};
     const andConditions = [];
 
-    /* ---------- CATEGORY ---------- */
-    if (category) {
-      const categoryDoc = await Category.findOne({ slug: category }).select(
-        "_id"
-      );
-      if (!categoryDoc) throw new Error(`Category "${category}" not found`);
-      andConditions.push({ category: categoryDoc._id });
+    /* ---------- MULTIPLE CATEGORIES ---------- */
+    if (categories) {
+      const categorySlugs = categories.split(",");
+      const categoryDocs = await Category.find({
+        slug: { $in: categorySlugs },
+      }).select("_id");
+      if (categoryDocs.length > 0) {
+        andConditions.push({
+          category: { $in: categoryDocs.map((c) => c._id) },
+        });
+      }
     }
-    if (sub_category) andConditions.push({ sub_category });
 
-    /* ---------- TAGS (Batch Query) ---------- */
+    /* ---------- PARENT + CHILD ---------- */
+    if (parent) {
+      const parentCategory = await Category.findOne({ slug: parent }).populate(
+        "children"
+      );
+      if (!parentCategory)
+        throw new Error(`Parent category "${parent}" not found`);
+
+      if (child) {
+        const childCategory = parentCategory.children.find(
+          (c) => c.slug === child
+        );
+        if (!childCategory)
+          throw new Error(`Child category "${child}" not found`);
+
+        andConditions.push({ subCategory: childCategory._id });
+      } else {
+        const allChildIds = parentCategory.children.map((c) => c._id);
+        andConditions.push({
+          $or: [
+            { category: parentCategory._id },
+            { subCategory: { $in: allChildIds } },
+          ],
+        });
+      }
+    }
+
+    /* ---------- SUB CATEGORY (direct) ---------- */
+    if (sub_category) {
+      andConditions.push({ subCategory: sub_category });
+    }
+
+    /* ---------- TAGS ---------- */
     let allTagSlugs = [];
     if (tags) allTagSlugs.push(...tags.split(","));
     if (tag) allTagSlugs.push(tag);
@@ -64,7 +101,7 @@ class APIFeatures {
     if (in_stock === "true") andConditions.push({ in_stock: true });
     if (on_sale === "true") andConditions.push({ on_sale: true });
 
-    /* ---------- ATTRIBUTES (Batch Query) ---------- */
+    /* ---------- ATTRIBUTES ---------- */
     if (attributes) {
       const attrArray = attributes.split(",");
       const attrSlugs = attrArray.map((a) => a.split(":")[0]);
@@ -94,7 +131,7 @@ class APIFeatures {
     if (andConditions.length > 0) filter.$and = andConditions;
     this.query = this.query.find(filter);
 
-    /* ---------- TEXT SEARCH (Fast) ---------- */
+    /* ---------- TEXT SEARCH ---------- */
     const searchTerm = search || q;
     if (searchTerm) {
       this.query = this.query.find({
