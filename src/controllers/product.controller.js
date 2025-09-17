@@ -16,12 +16,19 @@ const { generateUniqueSlug, createSlug } = require("../utils/slug");
 const formatAdditionalInfo = require("../utils/formatAdditionalInfo");
 
 // ------------------ GET ALL PRODUCTS (WITH FILTERS) ------------------
+// ------------------ GET ALL PRODUCTS (WITH FILTERS) ------------------
 exports.getAllProducts = catchAsync(async (req, res, next) => {
-  const totalProducts = await Product.countDocuments();
+  // First, create a filtered query to get the count
+  const countQuery = new APIFeatures(Product.find(), req.query);
+  await countQuery.buildFilters();
 
+  // Get the count of filtered products
+  const filteredCount = await countQuery.query.countDocuments();
+
+  // Now create the main query for actual data
   const features = new APIFeatures(Product.find(), req.query);
   await features.buildFilters();
-  features.sort().limitFields().paginate(totalProducts);
+  features.sort().limitFields().paginate(filteredCount); // Pass filtered count instead of total
 
   const products = await features.query
     .populate("tags", "name slug")
