@@ -734,3 +734,67 @@ exports.getNewSellerProducts = catchAsync(async (req, res, next) => {
     "New seller products fetched successfully"
   );
 });
+
+// ------------------ GET BEST SELLER PRODUCTS (WITH FILTERS) ------------------
+exports.getBestSellerProducts = catchAsync(async (req, res, next) => {
+  // Base filter: Only products with ratings (ratingsQuantity > 0)
+  const filter = { 
+    is_active: true, 
+    in_stock: true,
+    ratingsQuantity: { $gt: 0 } // Only products with at least 1 rating
+  };
+  
+  if (req.query.sellerId) {
+    filter.seller = req.query.sellerId;
+  }
+
+  // Count total products for seller (or all)
+  const totalProducts = await Product.countDocuments(filter);
+
+  // Apply API features (filters, pagination, etc.)
+  const features = new APIFeatures(Product.find(filter), req.query);
+  await features.buildFilters();
+
+  // Sort by best selling (ratings average and quantity)
+  features.query = features.query.sort({ 
+    ratingsAverage: -1, 
+    ratingsQuantity: -1,
+    createdAt: -1 
+  });
+  
+  features.limitFields().paginate(totalProducts);
+
+  // Fetch products
+  const products = await features.query
+    .populate("tags", "name slug")
+    .populate("category", "name slug")
+    .populate("subCategory", "name slug")
+    .populate({
+      path: "variations",
+      populate: { path: "attribute", select: "slug name type values" },
+    })
+    .populate({
+      path: "variation_options",
+      populate: {
+        path: "attributes.attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("image gallery", "original thumbnail");
+
+  // Format products
+  const formattedProducts = products.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
+
+  // Success response
+  return successResponse(
+    res,
+    {
+      products: formattedProducts,
+      pagination: features.pagination,
+    },
+    "Best seller products fetched successfully"
+  );
+});

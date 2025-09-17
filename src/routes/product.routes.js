@@ -9,7 +9,8 @@ const { protect, restrictTo } = require("../middleware/auth.middleware");
 router.get("/", productController.getAllProducts);
 router.get("/category", productController.getProductsByCategory);
 router.get("/categories", productController.getProductsByCategorySubCategories);
-router.get("/best-seller", productController.getNewSellerProducts);
+router.get("/best-seller", productController.getBestSellerProducts);
+router.get("/new-arrival", productController.getNewSellerProducts);
 router.get("/deals", productController.getDealProducts);
 router.get("/:slug", productController.getProduct);
 
