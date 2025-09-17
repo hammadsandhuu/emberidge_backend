@@ -92,48 +92,6 @@ async function dropDB() {
   console.log("All collections cleared successfully.");
   return true;
 }
-
-/** Seed database with default data without products*/
-// async function seedDB() {
-//   console.log("Seeding database with data from seedData.json...");
-
-//   const User = mongoose.models.User;
-//   const Category = mongoose.models.Category;
-
-//   // Create Users
-//   const users = [];
-//   for (const user of seedData.users) {
-//     const existingUser = await User.findOne({ email: user.email });
-//     if (!existingUser) {
-//       const newUser = await User.create(user);
-//       users.push(newUser);
-//       console.log(`Created user: ${user.email}`);
-//     } else {
-//       users.push(existingUser);
-//       console.log(`User already exists: ${user.email}`);
-//     }
-//   }
-
-//   const admin = users[0];
-
-//   // Create Categories
-//   for (const category of seedData.categories) {
-//     const existingCategory = await Category.findOne({ name: category.name });
-//     if (!existingCategory) {
-//       await Category.create({
-//         name: category.name,
-//         createdBy: admin._id,
-//         children: category.children.map((child) => ({ name: child })),
-//       });
-//       console.log(`Created category: ${category.name}`);
-//     } else {
-//       console.log(`Category already exists: ${category.name}`);
-//     }
-//   }
-
-//   console.log("Seeding complete.");
-// }
-
 /** Seed database with default data with products*/
 async function seedDB() {
   console.log("Seeding database with data from seedData.json...");
@@ -226,7 +184,7 @@ async function seedDB() {
       subCategory: subCategoryId,
       tags: tagIds,
       createdBy: admin._id,
-      slug, // ✅ Add slug here
+      slug, // Add slug here
     });
 
     console.log(`Created product: ${prod.name}`);

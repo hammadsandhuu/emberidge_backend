@@ -1,5 +1,5 @@
 // controllers/category.controller.js
-const Category = require("../models/category.model"); // ✅ Direct import
+const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/apiFeatures");
