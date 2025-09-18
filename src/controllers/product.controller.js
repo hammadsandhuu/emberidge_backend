@@ -16,19 +16,13 @@ const { generateUniqueSlug, createSlug } = require("../utils/slug");
 const formatAdditionalInfo = require("../utils/formatAdditionalInfo");
 
 // ------------------ GET ALL PRODUCTS (WITH FILTERS) ------------------
-// ------------------ GET ALL PRODUCTS (WITH FILTERS) ------------------
 exports.getAllProducts = catchAsync(async (req, res, next) => {
-  // First, create a filtered query to get the count
   const countQuery = new APIFeatures(Product.find(), req.query);
   await countQuery.buildFilters();
-
-  // Get the count of filtered products
   const filteredCount = await countQuery.query.countDocuments();
-
-  // Now create the main query for actual data
   const features = new APIFeatures(Product.find(), req.query);
   await features.buildFilters();
-  features.sort().limitFields().paginate(filteredCount); // Pass filtered count instead of total
+  features.sort().limitFields().paginate(filteredCount);
 
   const products = await features.query
     .populate("tags", "name slug")
@@ -116,6 +110,7 @@ exports.getProduct = catchAsync(async (req, res, next) => {
     "Product fetched successfully"
   );
 });
+
 
 // ------------------ CREATE PRODUCT ------------------
 exports.createProduct = catchAsync(async (req, res, next) => {
@@ -634,7 +629,7 @@ exports.getProductsByCategorySubCategories = catchAsync(
 );
 
 // ------------------ GET DEAL PRODUCTS (WITH FILTERS) ------------------
-exports.getDealProducts = catchAsync(async (req, res, next) => {
+exports.getSaleProducts = catchAsync(async (req, res, next) => {
   // Base filter: only products that are deals (on sale)
   const filter = { on_sale: true }; // OR use `is_deal: true` if you have that field
 
@@ -738,12 +733,12 @@ exports.getNewSellerProducts = catchAsync(async (req, res, next) => {
 // ------------------ GET BEST SELLER PRODUCTS (WITH FILTERS) ------------------
 exports.getBestSellerProducts = catchAsync(async (req, res, next) => {
   // Base filter: Only products with ratings (ratingsQuantity > 0)
-  const filter = { 
-    is_active: true, 
+  const filter = {
+    is_active: true,
     in_stock: true,
-    ratingsQuantity: { $gt: 0 } // Only products with at least 1 rating
+    ratingsQuantity: { $gt: 0 }, // Only products with at least 1 rating
   };
-  
+
   if (req.query.sellerId) {
     filter.seller = req.query.sellerId;
   }
@@ -756,12 +751,12 @@ exports.getBestSellerProducts = catchAsync(async (req, res, next) => {
   await features.buildFilters();
 
   // Sort by best selling (ratings average and quantity)
-  features.query = features.query.sort({ 
-    ratingsAverage: -1, 
+  features.query = features.query.sort({
+    ratingsAverage: -1,
     ratingsQuantity: -1,
-    createdAt: -1 
+    createdAt: -1,
   });
-  
+
   features.limitFields().paginate(totalProducts);
 
   // Fetch products

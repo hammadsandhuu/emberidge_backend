@@ -11,7 +11,7 @@ router.get("/category", productController.getProductsByCategory);
 router.get("/categories", productController.getProductsByCategorySubCategories);
 router.get("/best-seller", productController.getBestSellerProducts);
 router.get("/new-arrival", productController.getNewSellerProducts);
-router.get("/deals", productController.getDealProducts);
+router.get("/on-sale", productController.getSaleProducts);
 router.get("/:slug", productController.getProduct);
 
 // Review routes (public and authenticated)

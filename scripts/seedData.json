@@ -72,7 +72,7 @@
       "sale_price": 16,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 100,
       "tags": [
         { "name": "Baby" },
@@ -167,7 +167,7 @@
       "sale_price": 20,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 150,
       "tags": [
         { "name": "Baby" },
@@ -861,7 +861,7 @@
       "sale_price": 28,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 40,
       "tags": [
         { "name": "Baby" },
@@ -931,7 +931,7 @@
       "sale_price": 10,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 120,
       "tags": [
         { "name": "Baby" },
@@ -1023,7 +1023,7 @@
       "sale_price": 25,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 120,
       "tags": [
         { "name": "Key Chain" },
@@ -1050,7 +1050,7 @@
       "sale_price": 28,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 150,
       "tags": [
         { "name": "Key Chain" },
@@ -1634,7 +1634,7 @@
       "sale_price": 240,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 35,
       "tags": [{ "name": "Watch" }, { "name": "Metal" }, { "name": "Classic" }],
       "product_type": "simple"
@@ -1722,7 +1722,7 @@
       "sale_price": 160,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 35,
       "tags": [
         { "name": "Baby" },
@@ -1836,7 +1836,7 @@
       "sale_price": 13,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 70,
       "tags": [
         { "name": "Baby" },
@@ -1973,7 +1973,7 @@
       "sale_price": 18,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 60,
       "tags": [{ "name": "Baby" }, { "name": "Toys" }, { "name": "Plush" }],
       "product_type": "simple"
@@ -2062,7 +2062,7 @@
       "sale_price": 28,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 70,
       "tags": [{ "name": "Baby" }, { "name": "Feeding" }, { "name": "Glass" }],
       "product_type": "simple"
@@ -2280,7 +2280,7 @@
       "sale_price": 100,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 25,
       "tags": [
         { "name": "Baby" },
@@ -2481,7 +2481,7 @@
       "sale_price": 35,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 50,
       "tags": [{ "name": "Baby" }, { "name": "Bedding" }, { "name": "Soft" }],
       "product_type": "simple"
@@ -2547,7 +2547,7 @@
       "sale_price": 50,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 70,
       "tags": [
         { "name": "Bag" },
@@ -2891,7 +2891,7 @@
       "sale_price": 220,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 40,
       "tags": [
         { "name": "Watch" },
@@ -3739,7 +3739,7 @@
       "sale_price": 70,
       "on_sale": true,
       "sale_start": "2025-09-05T00:00:00Z",
-      "sale_end": "2025-09-15T23:59:59Z",
+      "sale_end": "2025-10-05T23:59:59Z",
       "quantity": 50,
       "tags": [
         { "name": "Sunglasses" },

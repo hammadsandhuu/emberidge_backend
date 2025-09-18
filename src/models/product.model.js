@@ -89,12 +89,9 @@ productSchema.index({
 });
 productSchema.index({ ratingsAverage: -1 });
 productSchema.index({ ratingsQuantity: -1 });
-
-// ✅ Safe Virtuals
 productSchema.virtual("reviewsCount").get(function () {
   return Array.isArray(this.reviews) ? this.reviews.length : 0;
 });
-
 productSchema.virtual("ratingSummary").get(function () {
   return {
     average: this.ratingsAverage || 0,
