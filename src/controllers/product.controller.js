@@ -494,32 +494,20 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
 exports.getProductsByCategory = catchAsync(async (req, res, next) => {
   const { parent: parentSlug } = req.query;
 
-  // Step 1: Base filter
-  const filter = {};
-  const andConditions = [];
+  // Step 1: Create base query
+  let query = Product.find();
 
-  // Step 2: Parent category check
-  if (parentSlug) {
-    const parentCategory = await Category.findOne({ slug: parentSlug });
-    if (!parentCategory) {
-      return errorResponse(res, "Parent category not found", 404);
-    }
+  // Step 2: Apply all filters using APIFeatures
+  const features = new APIFeatures(query, req.query);
+  await features.buildFilters();
 
-    // Only parent filter (ignore children)
-    andConditions.push({ category: parentCategory._id });
-  }
+  // Step 3: Get the filter object that was built
+  const filter = features.query.getFilter();
 
-  // Apply category filters
-  if (andConditions.length > 0) {
-    filter.$and = andConditions;
-  }
-
-  // Step 3: Count products
+  // Step 4: Count total products AFTER applying all filters
   const totalProducts = await Product.countDocuments(filter);
 
-  // Step 4: Query with filters + pagination
-  const features = new APIFeatures(Product.find(filter), req.query);
-  await features.buildFilters();
+  // Step 5: Apply sorting, field limiting, and pagination
   features.sort().limitFields().paginate(totalProducts);
 
   const products = await features.query
@@ -588,13 +576,17 @@ exports.getProductsByCategorySubCategories = catchAsync(
       filter.$and = andConditions;
     }
 
-    // Step 4: Count products
-    const totalProducts = await Product.countDocuments(filter);
+    // Step 4: Create count query with all filters
+    const countQuery = new APIFeatures(Product.find(filter), req.query);
+    await countQuery.buildFilters();
 
-    // Step 5: Query with filters + pagination
+    // Get the count of filtered products
+    const filteredCount = await countQuery.query.countDocuments();
+
+    // Step 5: Query with all filters + pagination
     const features = new APIFeatures(Product.find(filter), req.query);
     await features.buildFilters();
-    features.sort().limitFields().paginate(totalProducts);
+    features.sort().limitFields().paginate(filteredCount); // Use filtered count
 
     const products = await features.query
       .populate("tags", "name slug")
@@ -622,13 +614,14 @@ exports.getProductsByCategorySubCategories = catchAsync(
       res,
       {
         products: formattedProducts,
+        pagination: features.pagination, // Make sure to include pagination in response
       },
       "Products fetched successfully by parent & child category"
     );
   }
 );
 
-// ------------------ GET DEAL PRODUCTS (WITH FILTERS) ------------------
+// ------------------ GET sales PRODUCTS (WITH FILTERS) ------------------
 exports.getSaleProducts = catchAsync(async (req, res, next) => {
   // Base filter: only products that are deals (on sale)
   const filter = { on_sale: true }; // OR use `is_deal: true` if you have that field
