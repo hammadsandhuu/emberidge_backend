@@ -786,3 +786,75 @@ exports.getBestSellerProducts = catchAsync(async (req, res, next) => {
     "Best seller products fetched successfully"
   );
 });
+
+
+
+// ------------------ GET RELATED PRODUCTS ------------------
+exports.getRelatedProducts = catchAsync(async (req, res, next) => {
+  const { slug } = req.params;
+
+  // 1. Find current product by slug
+  const currentProduct = await Product.findOne({ slug }).select("category subCategory");
+  if (!currentProduct) return errorResponse(res, "Product not found", 404);
+
+  // 2. Base filter (exclude current product)
+  const filter = {
+    _id: { $ne: currentProduct._id },
+    is_active: true,
+  };
+
+  // 3. Check if category/subCategory passed in query, else fallback to current product
+  if (req.query.parent || req.query.child) {
+    // yahan APIFeatures parent/child filter handle karega automatically
+  } else {
+    if (currentProduct.subCategory) {
+      filter.subCategory = currentProduct.subCategory;
+    } else {
+      filter.category = currentProduct.category;
+    }
+  }
+
+  // 4. Count total related products
+  const countQuery = new APIFeatures(Product.find(filter), req.query);
+  await countQuery.buildFilters();
+  const totalProducts = await countQuery.query.countDocuments();
+
+  // 5. Apply filters + pagination + sorting
+  const features = new APIFeatures(Product.find(filter), req.query);
+  await features.buildFilters();
+  features.sort().limitFields().paginate(totalProducts);
+
+  // 6. Query related products
+  const relatedProducts = await features.query
+    .populate("tags", "name slug")
+    .populate("category", "name slug")
+    .populate("subCategory", "name slug")
+    .populate({
+      path: "variations",
+      populate: { path: "attribute", select: "slug name type values" },
+    })
+    .populate({
+      path: "variation_options",
+      populate: {
+        path: "attributes.attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("image gallery", "original thumbnail");
+
+  // 7. Format products
+  const formattedProducts = relatedProducts.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
+
+  // 8. Response
+  return successResponse(
+    res,
+    {
+      products: formattedProducts,
+      pagination: features.pagination,
+    },
+    "Related products fetched successfully"
+  );
+});

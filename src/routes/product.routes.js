@@ -13,6 +13,7 @@ router.get("/best-seller", productController.getBestSellerProducts);
 router.get("/new-arrival", productController.getNewSellerProducts);
 router.get("/on-sale", productController.getSaleProducts);
 router.get("/:slug", productController.getProduct);
+router.get("/:slug/related", productController.getRelatedProducts);
 
 // Review routes (public and authenticated)
 router.get("/:id/reviews", reviewController.getProductReviews);
