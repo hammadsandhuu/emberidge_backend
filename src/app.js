@@ -9,6 +9,7 @@ const hpp = require("hpp");
 const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const path = require("path");
+const app = express();
 
 const AppError = require("./utils/appError");
 const errorHandler = require("./middleware/error");
@@ -18,8 +19,9 @@ const userRoute = require("./routes/user.routes");
 const categoryRoutes = require("./routes/category.routes");
 const productRoutes = require("./routes/product.routes");
 const dealRoutes = require("./routes/deal.routes");
-
-const app = express();
+const cartRoutes = require("./routes/cart.routes");
+const wishlistRoutes = require("./routes/wishlist.routes");
+const orderRoutes = require("./routes/order.routes");
 
 // CORS
 app.use(cors());
@@ -66,6 +68,9 @@ app.use(
 
 // Compression
 app.use(compression());
+app.get("/", (req, res) => {
+  res.send("Hello world");
+});
 
 // Routes
 app.use("/auth", authRoutes);
@@ -73,19 +78,15 @@ app.use("/api/v1/users", userRoute);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/deals", dealRoutes);
-
-app.get("/", (req, res) => {
-  res.send("Hello world");
-});
+app.use("/api/v1/cart", cartRoutes);
+app.use("/api/v1/wishlist", wishlistRoutes);
+app.use("/api/v1/orders", orderRoutes);
 
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
-// 404 handler -> use AppError
 app.all("*", (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
-
-// Global error handler
 app.use(errorHandler);
 
 module.exports = app;
