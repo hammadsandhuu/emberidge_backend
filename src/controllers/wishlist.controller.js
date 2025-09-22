@@ -128,3 +128,37 @@ exports.moveToCart = catchAsync(async (req, res, next) => {
 
   return successResponse(res, { cart }, "Product moved to cart");
 });
+
+// Merge guest wishlist into user wishlist
+exports.mergeWishlist = catchAsync(async (req, res, next) => {
+  const userId = req.user._id;
+  const { productIds } = req.body; // array of product IDs from guest storage
+
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return errorResponse(res, "No products to merge", 400);
+  }
+
+  // Validate all products exist
+  const validProducts = await Product.find({ _id: { $in: productIds } }).select(
+    "_id"
+  );
+  const validIds = validProducts.map((p) => p._id.toString());
+
+  // Upsert all valid productIds into wishlist
+  const bulkOps = validIds.map((pid) => ({
+    updateOne: {
+      filter: { user: userId, product: pid },
+      update: { $setOnInsert: { user: userId, product: pid } },
+      upsert: true,
+    },
+  }));
+
+  if (bulkOps.length > 0) {
+    await Wishlist.bulkWrite(bulkOps);
+  }
+
+  // Return updated wishlist
+  const wishlist = await Wishlist.find({ user: userId }).populate("product");
+
+  return successResponse(res, { wishlist }, "Wishlist merged successfully");
+});

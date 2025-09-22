@@ -7,5 +7,7 @@ router.use(protect);
 router.get("/", wishlistController.getWishlist);
 router.post("/add/:productId", wishlistController.addToWishlist);
 router.delete("/remove/:productId", wishlistController.removeFromWishlist);
+router.post("/merge", wishlistController.mergeWishlist);
+
 
 module.exports = router;
