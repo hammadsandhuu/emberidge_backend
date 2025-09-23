@@ -10,11 +10,26 @@ exports.getCart = catchAsync(async (req, res, next) => {
     "items.product",
     "name slug price sale_price image in_stock quantity"
   );
+
   if (!cart) {
     return successResponse(res, { items: [] }, "Cart is empty");
   }
-  return successResponse(res, { cart }, "Cart fetched successfully");
+
+  // normalize items
+  const items = cart.items.map((i) => ({
+    id: i.product._id,
+    name: i.product.name,
+    price: i.product.price,
+    stock: i.product.quantity,
+    quantity: i.quantity,
+    in_stock: i.product.in_stock,
+    slug: i.product.slug,
+    image: i.product.image,
+  }));
+
+  return successResponse(res, { items }, "Cart fetched successfully");
 });
+
 
 // Add to cart (or create cart)
 exports.addToCart = catchAsync(async (req, res, next) => {
