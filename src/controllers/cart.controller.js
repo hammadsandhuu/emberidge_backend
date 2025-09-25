@@ -8,10 +8,12 @@ const calculateCartTotals = require("../utils/calculateCartTotals");
 
 // Get user cart
 exports.getCart = catchAsync(async (req, res, next) => {
-  let cart = await Cart.findOne({ user: req.user._id }).populate(
-    "items.product",
-    "name slug price sale_price image in_stock quantity"
-  );
+  let cart = await Cart.findOne({ user: req.user._id })
+    .populate(
+      "items.product",
+      "name slug price sale_price image in_stock quantity"
+    )
+    .populate("coupon", "code discountType discountValue expiry");
 
   if (!cart) {
     return successResponse(
