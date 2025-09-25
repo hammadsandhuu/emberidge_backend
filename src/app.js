@@ -22,6 +22,7 @@ const dealRoutes = require("./routes/deal.routes");
 const cartRoutes = require("./routes/cart.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
 const orderRoutes = require("./routes/order.routes");
+const couponRoutes = require("./routes/coupon.routes");
 
 // CORS
 app.use(cors());
@@ -81,6 +82,7 @@ app.use("/api/v1/deals", dealRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/wishlist", wishlistRoutes);
 app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/coupon", couponRoutes);
 
 // Static files
 app.use(express.static(path.join(__dirname, "public")));

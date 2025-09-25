@@ -5,25 +5,25 @@ const Product = require("../models/product.model");
 const catchAsync = require("../utils/catchAsync");
 const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
+const { redeemCoupon } = require("./coupon.controller");
 
 // Create order from user's cart
 exports.createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
   const { shippingAddress, paymentMethod = "COD", metadata = {} } = req.body;
 
-  // Load cart
   const cart = await Cart.findOne({ user: userId }).populate("items.product");
   if (!cart || cart.items.length === 0)
     return errorResponse(res, "Cart is empty", 400);
 
-  // Start transaction
   const session = await mongoose.startSession();
   session.startTransaction();
+
   try {
     const orderItems = [];
     let subtotal = 0;
 
-    // Validate stock & compute totals
+    // validate stock & snapshot products
     for (const item of cart.items) {
       const p = await Product.findById(item.product._id).session(session);
       if (!p) throw new Error(`Product ${item.product._id} not found`);
@@ -31,7 +31,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
         throw new Error(`Insufficient stock for product ${p.name}`);
       }
 
-      // snapshot
       const price = p.sale_price && p.on_sale ? p.sale_price : p.price;
       orderItems.push({
         product: p._id,
@@ -43,24 +42,20 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
       subtotal += price * item.quantity;
 
-      // decrement stock (for simple product)
       if (p.product_type === "simple") {
         p.quantity -= item.quantity;
-        if (p.quantity <= 0) {
-          p.in_stock = false;
-        }
+        if (p.quantity <= 0) p.in_stock = false;
         await p.save({ session });
-      } else {
-        // if variable product, you might update variation options — handle accordingly in your implementation
-        // For now we leave variation option update to other logic (extend if you support variation options)
       }
     }
 
-    // Compute shipping & totals (placeholder: free shipping over X, else fixed)
-    const shippingFee = subtotal > 100 ? 0 : 10; // customize per business rules
-    const totalAmount = subtotal + shippingFee;
+    const shippingFee = subtotal > 100 ? 0 : 10;
 
-    // Create order
+    // ✅ Apply coupon if present in cart
+    const discount = cart.discount || 0;
+    const coupon = cart.coupon || null;
+    const totalAmount = subtotal - discount + shippingFee;
+
     const order = await Order.create(
       [
         {
@@ -68,10 +63,12 @@ exports.createOrder = catchAsync(async (req, res, next) => {
           items: orderItems,
           shippingAddress,
           paymentMethod,
-          paymentStatus: paymentMethod === "COD" ? "pending" : "pending",
+          paymentStatus: "pending",
           orderStatus: "processing",
           subtotal,
           shippingFee,
+          discount,
+          coupon,
           totalAmount,
           metadata,
         },
@@ -79,8 +76,18 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       { session }
     );
 
-    // Clear cart
-    await Cart.findOneAndUpdate({ user: userId }, { items: [] }, { session });
+    // ✅ Redeem coupon usage
+    if (coupon) {
+      await redeemCoupon(coupon, userId);
+    }
+
+    // clear cart
+    cart.items = [];
+    cart.coupon = null;
+    cart.discount = 0;
+    cart.total = 0;
+    cart.finalTotal = 0;
+    await cart.save({ session });
 
     await session.commitTransaction();
     session.endSession();

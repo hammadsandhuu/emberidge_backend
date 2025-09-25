@@ -7,7 +7,7 @@ const orderItemSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
-    name: { type: String },
+    name: String,
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
     image: { type: mongoose.Schema.Types.ObjectId, ref: "Image" },
@@ -49,6 +49,12 @@ const orderSchema = new mongoose.Schema(
     },
     subtotal: { type: Number, required: true, default: 0 },
     shippingFee: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 }, // ✅ discount applied
+    coupon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+    }, // ✅ coupon reference
     totalAmount: { type: Number, required: true, default: 0 },
     metadata: { type: Object, default: {} },
   },

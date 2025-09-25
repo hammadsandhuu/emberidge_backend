@@ -1,21 +1,29 @@
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
+const Coupon = require("../models/coupon.model");
 const catchAsync = require("../utils/catchAsync");
 const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
+const calculateCartTotals = require("../utils/calculateCartTotals");
 
 // Get user cart
 exports.getCart = catchAsync(async (req, res, next) => {
-  const cart = await Cart.findOne({ user: req.user._id }).populate(
+  let cart = await Cart.findOne({ user: req.user._id }).populate(
     "items.product",
     "name slug price sale_price image in_stock quantity"
   );
 
   if (!cart) {
-    return successResponse(res, { items: [] }, "Cart is empty");
+    return successResponse(
+      res,
+      { items: [], total: 0, discount: 0, finalTotal: 0 },
+      "Cart is empty"
+    );
   }
 
-  // normalize items
+  cart = await calculateCartTotals(cart, req.user._id);
+  await cart.save();
+
   const items = cart.items.map((i) => ({
     id: i.product._id,
     name: i.product.name,
@@ -27,9 +35,18 @@ exports.getCart = catchAsync(async (req, res, next) => {
     image: i.product.image,
   }));
 
-  return successResponse(res, { items }, "Cart fetched successfully");
+  return successResponse(
+    res,
+    {
+      items,
+      total: cart.total,
+      discount: cart.discount,
+      finalTotal: cart.finalTotal,
+      coupon: cart.coupon,
+    },
+    "Cart fetched successfully"
+  );
 });
-
 
 // Add to cart (or create cart)
 exports.addToCart = catchAsync(async (req, res, next) => {
@@ -110,4 +127,46 @@ exports.clearCart = catchAsync(async (req, res, next) => {
     { new: true }
   );
   return successResponse(res, {}, "Cart cleared successfully");
+});
+
+// Apply coupon
+exports.applyCoupon = catchAsync(async (req, res, next) => {
+  const { code } = req.body;
+  if (!code) return errorResponse(res, "Coupon code is required", 400);
+
+  const coupon = await Coupon.findOne({
+    code: code.toUpperCase(),
+    isActive: true,
+  });
+  if (!coupon) return errorResponse(res, "Invalid coupon", 400);
+
+  const cart = await Cart.findOne({ user: req.user._id });
+  if (!cart) return errorResponse(res, "Cart not found", 404);
+
+  if (coupon.isExpired) return errorResponse(res, "Coupon expired", 400);
+  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit)
+    return errorResponse(res, "Coupon usage limit reached", 400);
+
+  const userUsage = coupon.userUsage.get(req.user._id.toString()) || 0;
+  if (userUsage >= coupon.perUserLimit)
+    return errorResponse(res, "You already used this coupon", 400);
+
+  cart.coupon = coupon._id;
+  await calculateCartTotals(cart, req.user._id);
+  await cart.save();
+
+  return successResponse(res, { cart }, "Coupon applied successfully");
+});
+
+// Remove coupon
+exports.removeCoupon = catchAsync(async (req, res, next) => {
+  const cart = await Cart.findOne({ user: req.user._id });
+  if (!cart) return errorResponse(res, "Cart not found", 404);
+
+  cart.coupon = null;
+  cart.discount = 0;
+  await calculateCartTotals(cart, req.user._id);
+  await cart.save();
+
+  return successResponse(res, { cart }, "Coupon removed successfully");
 });
