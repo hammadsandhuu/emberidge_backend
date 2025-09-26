@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const addressSchema = require("./address.schema");
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -24,14 +25,10 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
     items: [orderItemSchema],
-    shippingAddress: {
-      fullName: String,
-      address: String,
-      city: String,
-      postalCode: String,
-      country: String,
-      phoneNumber: String,
-    },
+
+    // 📦 Snapshot of selected address from user's address book
+    shippingAddress: addressSchema,
+
     paymentMethod: {
       type: String,
       enum: ["COD", "Stripe", "Paypal"],
@@ -49,12 +46,12 @@ const orderSchema = new mongoose.Schema(
     },
     subtotal: { type: Number, required: true, default: 0 },
     shippingFee: { type: Number, default: 0 },
-    discount: { type: Number, default: 0 }, // ✅ discount applied
+    discount: { type: Number, default: 0 },
     coupon: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Coupon",
       default: null,
-    }, // ✅ coupon reference
+    },
     totalAmount: { type: Number, required: true, default: 0 },
     metadata: { type: Object, default: {} },
   },

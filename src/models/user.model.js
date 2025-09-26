@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const validator = require("validator");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const addressSchema = require("./address.schema");
 
 const userSchema = new mongoose.Schema(
   {
@@ -17,7 +18,6 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       validate: [validator.isEmail, "Please provide a valid email"],
     },
-    address: String,
     dateOfBirth: Date,
     phoneNumber: {
       type: String,
@@ -34,6 +34,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    // 📦 Address Book (multiple addresses)
+    addresses: [addressSchema],
+
     role: {
       type: String,
       enum: ["user", "admin"],
@@ -47,14 +51,17 @@ const userSchema = new mongoose.Schema(
     },
     passwordConfirm: {
       type: String,
-      required: [true, "Please confirm your password"],
+      required: function () {
+        return this.isNew;
+      },
       validate: {
         validator: function (el) {
-          return el === this.password;
+          return this.isNew ? el === this.password : true;
         },
         message: "Passwords are not the same!",
       },
     },
+
     passwordChangedAt: Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
@@ -64,10 +71,37 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-// Encrypt password
+// 📌 Virtual: Default Complete Address
+userSchema.virtual("completeAddress").get(function () {
+  if (!this.addresses || this.addresses.length === 0) return "";
+
+  const address = this.addresses.find((a) => a.isDefault) || this.addresses[0];
+
+  return `${
+    address.fullName
+  }, ${address.streetAddress}, ${address.area || ""}, ${address.city}, ${address.state || ""}, ${address.country} - ${address.postalCode}, Phone: ${address.phoneNumber}`;
+});
+
+// 📌 Pre-save hook: Ensure only 1 default address
+userSchema.pre("save", function (next) {
+  if (this.addresses && this.addresses.length > 1) {
+    let defaultCount = this.addresses.filter((a) => a.isDefault).length;
+    if (defaultCount === 0) {
+      this.addresses[0].isDefault = true; // pehla default banado
+    } else if (defaultCount > 1) {
+      // agar multiple default mile to sirf pehla rakho
+      this.addresses.forEach((a, i) => {
+        a.isDefault = i === 0;
+      });
+    }
+  }
+  next();
+});
+
+// 🔒 Encrypt password
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 

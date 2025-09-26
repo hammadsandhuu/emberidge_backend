@@ -5,19 +5,33 @@ const { protect, restrictTo } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
-router.get("/me", protect, userController.getMe);
+router.use(protect);
+router
+  .route("/me")
+  .get(userController.getMe)
+  .patch(uploadAvatar.single("avatar"), userController.updateMe);
+
+// Address Book
+router
+  .route("/me/addresses")
+  .get(userController.getAddresses)
+  .post(userController.addAddress);
+
+router.get("/me/addresses/default", userController.getDefaultAddress);
+
+router
+  .route("/me/addresses/:addressId")
+  .patch(userController.updateAddress)
+  .delete(userController.deleteAddress);
 
 router.patch(
-  "/me",
-  protect,
-  uploadAvatar.single("avatar"),
-  userController.updateMe
+  "/me/addresses/:addressId/default",
+  userController.setDefaultAddress
 );
 
-router.use(protect, restrictTo("admin"));
-
-router.get("/", userController.getAllUsers);
-
+// Admin Routes
+router.use(restrictTo("admin"));
+router.route("/").get(userController.getAllUsers); 
 router
   .route("/:id")
   .get(userController.getUser)
