@@ -49,13 +49,17 @@ exports.addAddress = catchAsync(async (req, res) => {
   if (!user) return errorResponse(res, "User not found", 404);
 
   const newAddress = req.body;
-
-  // if first address, mark as default
   if (user.addresses.length === 0) {
     newAddress.isDefault = true;
+  } else if (newAddress.isDefault) {
+    user.addresses.forEach((addr) => {
+      addr.isDefault = false;
+    });
   }
 
+  // Push new address
   user.addresses.push(newAddress);
+
   await user.save();
 
   return successResponse(
@@ -65,6 +69,7 @@ exports.addAddress = catchAsync(async (req, res) => {
     201
   );
 });
+
 
 // Get all addresses
 exports.getAddresses = catchAsync(async (req, res) => {
