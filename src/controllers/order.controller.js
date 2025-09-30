@@ -1,5 +1,9 @@
+// make sure stripe is initialized
+const Stripe = require("stripe");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const mongoose = require("mongoose");
 const Order = require("../models/order.model");
+const User = require("../models/user.model");
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 const catchAsync = require("../utils/catchAsync");
@@ -7,10 +11,29 @@ const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
 const { redeemCoupon } = require("./coupon.controller");
 
-// Create order from user's cart
 exports.createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
-  const { shippingAddress, paymentMethod = "COD", metadata = {} } = req.body;
+  const { addressId, paymentMethod = "COD", metadata = {} } = req.body;
+
+  // 1) Load user + address snapshot
+  const user = await User.findById(userId).populate("addresses");
+  if (!user) return errorResponse(res, "User not found", 404);
+
+  const shippingAddress = user.addresses.id(addressId);
+  if (!shippingAddress) return errorResponse(res, "Address not found", 400);
+
+  const shippingSnapshot = {
+    fullName: shippingAddress.fullName,
+    phoneNumber: shippingAddress.phoneNumber,
+    country: shippingAddress.country,
+    state: shippingAddress.state,
+    city: shippingAddress.city,
+    area: shippingAddress.area,
+    streetAddress: shippingAddress.streetAddress,
+    apartment: shippingAddress.apartment,
+    postalCode: shippingAddress.postalCode,
+    label: shippingAddress.label,
+  };
 
   const cart = await Cart.findOne({ user: userId }).populate("items.product");
   if (!cart || cart.items.length === 0)
@@ -23,7 +46,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     const orderItems = [];
     let subtotal = 0;
 
-    // validate stock & snapshot products
     for (const item of cart.items) {
       const p = await Product.findById(item.product._id).session(session);
       if (!p) throw new Error(`Product ${item.product._id} not found`);
@@ -42,6 +64,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
       subtotal += price * item.quantity;
 
+      // decrement stock for simple products
       if (p.product_type === "simple") {
         p.quantity -= item.quantity;
         if (p.quantity <= 0) p.in_stock = false;
@@ -50,38 +73,52 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     }
 
     const shippingFee = subtotal > 100 ? 0 : 10;
-
-    // ✅ Apply coupon if present in cart
     const discount = cart.discount || 0;
     const coupon = cart.coupon || null;
     const totalAmount = subtotal - discount + shippingFee;
 
-    const order = await Order.create(
-      [
-        {
-          user: userId,
-          items: orderItems,
-          shippingAddress,
-          paymentMethod,
-          paymentStatus: "pending",
-          orderStatus: "processing",
-          subtotal,
-          shippingFee,
-          discount,
-          coupon,
-          totalAmount,
-          metadata,
-        },
-      ],
-      { session }
-    );
+    const orderData = {
+      user: userId,
+      items: orderItems,
+      shippingAddress: shippingSnapshot,
+      paymentMethod,
+      paymentStatus: paymentMethod === "stripe" ? "pending" : "unpaid",
+      orderStatus: "processing",
+      subtotal,
+      shippingFee,
+      discount,
+      coupon,
+      totalAmount,
+      metadata,
+    };
 
-    // ✅ Redeem coupon usage
+    let clientSecret = null;
+
+    // create Stripe PaymentIntent if stripe selected
+    if (paymentMethod === "stripe") {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100),
+        currency: "aed",
+        payment_method_types: ["card"], // ✅ force only card payments
+        metadata: {
+          userId: userId.toString(),
+          ...metadata,
+        },
+      });
+
+      orderData.paymentIntentId = paymentIntent.id;
+      clientSecret = paymentIntent.client_secret;
+    }
+
+    // create order inside same session
+    const [order] = await Order.create([orderData], { session });
+
+    // redeem coupon if exists
     if (coupon) {
       await redeemCoupon(coupon, userId);
     }
 
-    // clear cart
+    // clear cart (inside session)
     cart.items = [];
     cart.coupon = null;
     cart.discount = 0;
@@ -92,15 +129,17 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
+    // success: return order + clientSecret (frontend will use clientSecret to confirm)
     return successResponse(
       res,
-      { order: order[0] },
+      { order, clientSecret },
       "Order created successfully",
       201
     );
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
+    console.error("createOrder error:", err);
     return errorResponse(res, err.message || "Order creation failed", 400);
   }
 });
@@ -159,7 +198,7 @@ exports.updateOrderStatus = catchAsync(async (req, res, next) => {
 
 // Cancel order (user or admin)
 exports.cancelOrder = catchAsync(async (req, res, next) => {
-  console.log(req.params.id,"here is my id");
+  console.log(req.params.id, "here is my id");
   const order = await Order.findById(req.params.id);
 
   if (!order) return errorResponse(res, "Order not found", 404);
@@ -177,7 +216,6 @@ exports.cancelOrder = catchAsync(async (req, res, next) => {
   // Optionally restore stock (implement per business rules)
   return successResponse(res, { order }, "Order cancelled");
 });
-
 
 // Admin: delete order
 exports.deleteOrder = catchAsync(async (req, res, next) => {

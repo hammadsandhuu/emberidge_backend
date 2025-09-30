@@ -1,3 +1,4 @@
+// models/order.model.js
 const mongoose = require("mongoose");
 const addressSchema = require("./address.schema");
 
@@ -25,20 +26,18 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
     items: [orderItemSchema],
-
-    // 📦 Snapshot of selected address from user's address book
     shippingAddress: addressSchema,
-
     paymentMethod: {
       type: String,
-      enum: ["COD", "Stripe", "Paypal"],
-      default: "COD",
+      enum: ["COD", "stripe", "paypal"],
+      default: "stripe",
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
+      enum: ["pending", "paid", "failed", "refunded", "unpaid"],
       default: "pending",
     },
+    paymentIntentId: { type: String, default: null },
     orderStatus: {
       type: String,
       enum: ["processing", "shipped", "delivered", "cancelled"],
