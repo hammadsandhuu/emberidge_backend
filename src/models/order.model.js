@@ -1,6 +1,6 @@
 // models/order.model.js
 const mongoose = require("mongoose");
-const addressSchema = require("./address.schema");
+const addressSchema = require("./address.model");
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -29,7 +29,7 @@ const orderSchema = new mongoose.Schema(
     shippingAddress: addressSchema,
     paymentMethod: {
       type: String,
-      enum: ["COD", "stripe", "paypal"],
+      enum: ["COD", "stripe", "applepay"],
       default: "stripe",
     },
     paymentStatus: {
