@@ -10,8 +10,28 @@ const catchAsync = require("../utils/catchAsync");
 const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
 const { redeemCoupon } = require("./coupon.controller");
+const APIFeatures = require("../utils/apiFeatures");
 
+// Get all orders (paginated)
+exports.getAllOrders = catchAsync(async (req, res, next) => {
+  const total = await Order.countDocuments();
 
+  const features = new APIFeatures(
+    Order.find()
+      .populate("user", "name email")
+      .populate("items.product", "name slug image"),
+    req.query
+  );
+
+  features.sort().limitFields().paginate(total);
+  const orders = await features.query;
+
+  return successResponse(
+    res,
+    { orders, pagination: features.pagination },
+    "All orders fetched successfully"
+  );
+});
 
 // Create Order
 exports.createOrder = catchAsync(async (req, res, next) => {
@@ -97,8 +117,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     };
 
     let clientSecret = null;
-
-    // 🔹 Stripe PaymentIntent
     if (paymentMethod === "stripe") {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(totalAmount * 100),
@@ -132,8 +150,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     if (coupon) {
       await redeemCoupon(coupon, userId);
     }
-
-    // Clear the cart
     cart.items = [];
     cart.coupon = null;
     cart.discount = 0;
@@ -157,7 +173,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     return errorResponse(res, err.message || "Order creation failed", 400);
   }
 });
-
 
 //  Get user's all orders (paginated)
 exports.getOrders = catchAsync(async (req, res, next) => {
@@ -263,23 +278,3 @@ exports.deleteOrder = catchAsync(async (req, res, next) => {
   return successResponse(res, null, "Order deleted successfully");
 });
 
-// Admin: Get all orders (paginated)
-exports.getAllOrders = catchAsync(async (req, res, next) => {
-  const total = await Order.countDocuments();
-
-  const features = new APIFeatures(
-    Order.find()
-      .populate("user", "name email")
-      .populate("items.product", "name slug image"),
-    req.query
-  );
-
-  features.sort().limitFields().paginate(total);
-  const orders = await features.query;
-
-  return successResponse(
-    res,
-    { orders, pagination: features.pagination },
-    "All orders fetched successfully"
-  );
-});
