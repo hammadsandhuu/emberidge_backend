@@ -11,6 +11,9 @@ const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
 const { redeemCoupon } = require("./coupon.controller");
 
+
+
+// Create Order
 exports.createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
   const { addressId, paymentMethod = "COD", metadata = {} } = req.body;
@@ -64,7 +67,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
       subtotal += price * item.quantity;
 
-      // decrement stock for simple products
       if (p.product_type === "simple") {
         p.quantity -= item.quantity;
         if (p.quantity <= 0) p.in_stock = false;
@@ -94,14 +96,27 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     let clientSecret = null;
 
-    // create Stripe PaymentIntent if stripe selected
+    // 🔹 Create Stripe PaymentIntent (with shipping info)
     if (paymentMethod === "stripe") {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(totalAmount * 100),
         currency: "aed",
-        payment_method_types: ["card"], // ✅ force only card payments
+        payment_method_types: ["card"],
+        shipping: {
+          name: shippingSnapshot.fullName,
+          phone: shippingSnapshot.phoneNumber,
+          address: {
+            line1: shippingSnapshot.streetAddress,
+            line2: shippingSnapshot.apartment || "",
+            city: shippingSnapshot.city,
+            state: shippingSnapshot.state || "",
+            country: shippingSnapshot.country,
+            postal_code: shippingSnapshot.postalCode,
+          },
+        },
         metadata: {
           userId: userId.toString(),
+          orderType: "product-order",
           ...metadata,
         },
       });
@@ -110,15 +125,12 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       clientSecret = paymentIntent.client_secret;
     }
 
-    // create order inside same session
     const [order] = await Order.create([orderData], { session });
 
-    // redeem coupon if exists
     if (coupon) {
       await redeemCoupon(coupon, userId);
     }
 
-    // clear cart (inside session)
     cart.items = [];
     cart.coupon = null;
     cart.discount = 0;
@@ -129,7 +141,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    // success: return order + clientSecret (frontend will use clientSecret to confirm)
     return successResponse(
       res,
       { order, clientSecret },
@@ -224,6 +235,7 @@ exports.deleteOrder = catchAsync(async (req, res, next) => {
   return successResponse(res, null, "Order deleted successfully");
 });
 
+// Get All orders
 exports.getAllOrders = catchAsync(async (req, res, next) => {
   const total = await Order.countDocuments();
   const APIFeatures = require("../utils/apiFeatures");
