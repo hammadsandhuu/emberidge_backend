@@ -52,6 +52,7 @@ const productSchema = new mongoose.Schema(
     variation_options: [
       { type: mongoose.Schema.Types.ObjectId, ref: "VariationOption" },
     ],
+    shippingFee: { type: Number, min: 0, default: 0 },
     in_stock: { type: Boolean, default: true, index: true },
     is_active: { type: Boolean, default: true, index: true },
     additional_info: { type: Map, of: String, default: {} },

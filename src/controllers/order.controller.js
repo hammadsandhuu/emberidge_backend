@@ -17,8 +17,6 @@ const { redeemCoupon } = require("./coupon.controller");
 exports.createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
   const { addressId, paymentMethod = "COD", metadata = {} } = req.body;
-
-  // 1) Load user + address snapshot
   const user = await User.findById(userId).populate("addresses");
   if (!user) return errorResponse(res, "User not found", 404);
 
@@ -48,6 +46,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
   try {
     const orderItems = [];
     let subtotal = 0;
+    let shippingFee = 0;
 
     for (const item of cart.items) {
       const p = await Product.findById(item.product._id).session(session);
@@ -57,15 +56,19 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       }
 
       const price = p.sale_price && p.on_sale ? p.sale_price : p.price;
+      const productShippingFee = p.shippingFee || 0;
+
       orderItems.push({
         product: p._id,
         name: p.name,
         price,
         quantity: item.quantity,
         image: p.image || null,
+        shippingFee: productShippingFee,
       });
 
       subtotal += price * item.quantity;
+      shippingFee += productShippingFee * item.quantity;
 
       if (p.product_type === "simple") {
         p.quantity -= item.quantity;
@@ -74,7 +77,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       }
     }
 
-    const shippingFee = subtotal > 100 ? 0 : 10;
     const discount = cart.discount || 0;
     const coupon = cart.coupon || null;
     const totalAmount = subtotal - discount + shippingFee;
@@ -96,11 +98,11 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     let clientSecret = null;
 
-    // 🔹 Create Stripe PaymentIntent (with shipping info)
+    // 🔹 Stripe PaymentIntent
     if (paymentMethod === "stripe") {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(totalAmount * 100),
-        currency: "aed",
+        currency: "sar",
         payment_method_types: ["card"],
         shipping: {
           name: shippingSnapshot.fullName,
@@ -131,6 +133,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       await redeemCoupon(coupon, userId);
     }
 
+    // Clear the cart
     cart.items = [];
     cart.coupon = null;
     cart.discount = 0;
