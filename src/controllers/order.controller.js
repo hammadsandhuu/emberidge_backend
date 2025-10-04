@@ -158,90 +158,114 @@ exports.createOrder = catchAsync(async (req, res, next) => {
   }
 });
 
-// Get user's orders (paginated)
+
+//  Get user's all orders (paginated)
 exports.getOrders = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
-  const APIFeatures = require("../utils/apiFeatures");
 
   const total = await Order.countDocuments({ user: userId });
   const features = new APIFeatures(
     Order.find({ user: userId }).populate("items.product", "name slug image"),
     req.query
   );
+
   features.sort().limitFields().paginate(total);
   const orders = await features.query;
+
   return successResponse(
     res,
     { orders, pagination: features.pagination },
-    "Orders fetched"
+    "Orders fetched successfully"
   );
 });
 
-// Get single order (ensure owner or admin)
+//  Get single order (ensure owner or admin)
 exports.getOrder = catchAsync(async (req, res, next) => {
   const order = await Order.findById(req.params.id).populate(
     "items.product",
     "name slug image"
   );
+
   if (!order) return errorResponse(res, "Order not found", 404);
-  // If you have admin check, enforce here. For now ensure owner:
+
+  // Authorization check
   if (
     order.user.toString() !== req.user._id.toString() &&
     req.user.role !== "admin"
   ) {
     return errorResponse(res, "Not authorized to view this order", 403);
   }
-  return successResponse(res, { order }, "Order fetched");
+
+  return successResponse(res, { order }, "Order fetched successfully");
 });
 
-// Admin: update order status
+//  Admin: update order status
 exports.updateOrderStatus = catchAsync(async (req, res, next) => {
   if (req.user.role !== "admin") return errorResponse(res, "Admin only", 403);
+
   const { status } = req.body;
   const allowed = ["processing", "shipped", "delivered", "cancelled"];
   if (!allowed.includes(status))
     return errorResponse(res, "Invalid status", 400);
+
   const order = await Order.findByIdAndUpdate(
     req.params.id,
     { orderStatus: status },
     { new: true }
-  );
+  ).populate("user", "name email");
+
   if (!order) return errorResponse(res, "Order not found", 404);
-  return successResponse(res, { order }, "Order status updated");
+
+  return successResponse(res, { order }, "Order status updated successfully");
 });
 
-// Cancel order (user or admin)
+//  Cancel order (user or admin)
 exports.cancelOrder = catchAsync(async (req, res, next) => {
-  console.log(req.params.id, "here is my id");
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findById(req.params.id).populate("items.product");
 
   if (!order) return errorResponse(res, "Order not found", 404);
+
+  // Authorization
   if (
     order.user.toString() !== req.user._id.toString() &&
     req.user.role !== "admin"
   ) {
-    return errorResponse(res, "Not authorized", 403);
+    return errorResponse(res, "Not authorized to cancel this order", 403);
   }
-  // Only allow cancel if not delivered
+
+  // Cannot cancel delivered
   if (order.orderStatus === "delivered")
-    return errorResponse(res, "Cannot cancel delivered order", 400);
+    return errorResponse(res, "Cannot cancel a delivered order", 400);
+
   order.orderStatus = "cancelled";
   await order.save();
-  // Optionally restore stock (implement per business rules)
-  return successResponse(res, { order }, "Order cancelled");
+
+  // ✅ Optional: Restore stock after cancellation
+  for (const item of order.items) {
+    const product = await Product.findById(item.product._id);
+    if (product && product.product_type === "simple") {
+      product.quantity += item.quantity;
+      product.in_stock = true;
+      await product.save();
+    }
+  }
+
+  return successResponse(res, { order }, "Order cancelled successfully");
 });
 
 // Admin: delete order
 exports.deleteOrder = catchAsync(async (req, res, next) => {
+  if (req.user.role !== "admin") return errorResponse(res, "Admin only", 403);
+
   const order = await Order.findByIdAndDelete(req.params.orderId);
   if (!order) return errorResponse(res, "Order not found", 404);
+
   return successResponse(res, null, "Order deleted successfully");
 });
 
-// Get All orders
+// Admin: Get all orders (paginated)
 exports.getAllOrders = catchAsync(async (req, res, next) => {
   const total = await Order.countDocuments();
-  const APIFeatures = require("../utils/apiFeatures");
 
   const features = new APIFeatures(
     Order.find()
@@ -249,12 +273,13 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
       .populate("items.product", "name slug image"),
     req.query
   );
+
   features.sort().limitFields().paginate(total);
   const orders = await features.query;
 
   return successResponse(
     res,
     { orders, pagination: features.pagination },
-    "All orders fetched"
+    "All orders fetched successfully"
   );
 });
