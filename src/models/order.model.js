@@ -1,6 +1,8 @@
-// models/order.model.js
 const mongoose = require("mongoose");
 const addressSchema = require("./address.model");
+
+const ORDER_PREFIX = process.env.ORDER_PREFIX || "ORD";
+const TRACKING_PREFIX = process.env.TRACKING_PREFIX || "EMB";
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -13,6 +15,7 @@ const orderItemSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
     image: { type: mongoose.Schema.Types.ObjectId, ref: "Image" },
+    shippingFee: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -27,6 +30,19 @@ const orderSchema = new mongoose.Schema(
     },
     items: [orderItemSchema],
     shippingAddress: addressSchema,
+
+    // ✅ New fields
+    orderNumber: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    trackingNumber: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+
     paymentMethod: {
       type: String,
       enum: ["COD", "stripe", "applepay"],
@@ -56,5 +72,42 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+/* 
+-----------------------------------------
+  🔹 AUTO GENERATE orderNumber & trackingNumber
+-----------------------------------------
+*/
+orderSchema.pre("validate", async function (next) {
+  // Generate tracking number if not exists
+  if (!this.trackingNumber) {
+    const uniqueId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const timestamp = Date.now().toString().slice(-5);
+    this.trackingNumber = `${TRACKING_PREFIX}-${timestamp}-${uniqueId}`;
+  }
+
+  // Generate sequential order number if not exists
+  if (!this.orderNumber) {
+    const year = new Date().getFullYear();
+    const lastOrder = await mongoose
+      .model("Order")
+      .findOne()
+      .sort({ createdAt: -1 });
+
+    let nextSeq = 1;
+    if (lastOrder && lastOrder.orderNumber) {
+      const regex = new RegExp(`^${ORDER_PREFIX}-${year}-(\\d+)$`);
+      const match = lastOrder.orderNumber.match(regex);
+      if (match) nextSeq = parseInt(match[1], 10) + 1;
+    }
+
+    this.orderNumber = `${ORDER_PREFIX}-${year}-${String(nextSeq).padStart(
+      6,
+      "0"
+    )}`;
+  }
+
+  next();
+});
 
 module.exports = mongoose.model("Order", orderSchema);

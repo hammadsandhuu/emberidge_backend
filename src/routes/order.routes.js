@@ -9,6 +9,8 @@ router.get("/", orderController.getOrders);
 router.post("/", orderController.createOrder);
 router.get("/:id", orderController.getOrder);
 router.patch("/:id/cancel", orderController.cancelOrder);
+router.get("/track/:trackingNumber", orderController.trackOrder);
+
 
 // Admin routes
 router.use(restrictTo("admin"));

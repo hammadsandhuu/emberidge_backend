@@ -11,6 +11,8 @@ const successResponse = require("../utils/successResponse");
 const errorResponse = require("../utils/errorResponse");
 const { redeemCoupon } = require("./coupon.controller");
 const APIFeatures = require("../utils/apiFeatures");
+const orderConfirmationEmail = require("../templates/emails/orderConfirmationEmail");
+const sendEmail = require("../utils/email");
 
 // Get all orders (paginated)
 exports.getAllOrders = catchAsync(async (req, res, next) => {
@@ -159,6 +161,25 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: `Order Confirmation - ${order.orderNumber || order._id}`,
+        html: orderConfirmationEmail({
+          fullName: shippingSnapshot.fullName,
+          orderNumber: order.orderNumber || order._id,
+          trackingNumber: order.trackingNumber || "Not Assigned Yet",
+          totalAmount: order.totalAmount.toFixed(2),
+          paymentMethod: order.paymentMethod,
+          orderStatus: order.orderStatus,
+          streetAddress: shippingSnapshot.streetAddress,
+          city: shippingSnapshot.city,
+          country: shippingSnapshot.country,
+        }),
+      });
+    } catch (emailErr) {
+      console.error("Order confirmation email failed:", emailErr);
+    }
 
     return successResponse(
       res,
@@ -278,3 +299,26 @@ exports.deleteOrder = catchAsync(async (req, res, next) => {
   return successResponse(res, null, "Order deleted successfully");
 });
 
+// Track order by tracking number (public)
+exports.trackOrder = catchAsync(async (req, res, next) => {
+  const { trackingNumber } = req.params;
+
+  const order = await Order.findOne({ trackingNumber })
+    .populate("user", "name email")
+    .populate("items.product", "name slug image");
+
+  if (!order) return errorResponse(res, "Invalid tracking number", 404);
+
+  const trackingInfo = {
+    trackingNumber: order.trackingNumber,
+    orderNumber: order.orderNumber,
+    status: order.orderStatus,
+    paymentStatus: order.paymentStatus,
+    totalAmount: order.totalAmount,
+    shippingAddress: order.shippingAddress,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  };
+
+  return successResponse(res, { trackingInfo }, "Order tracking info fetched");
+});
