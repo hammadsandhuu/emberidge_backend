@@ -4,6 +4,7 @@ const Stripe = require("stripe");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const Order = require("../models/order.model");
 const sendEmail = require("../utils/email");
+const orderConfirmationEmail = require("../templates/emails/orderConfirmationEmail");
 
 /*
   ⚠️ IMPORTANT
