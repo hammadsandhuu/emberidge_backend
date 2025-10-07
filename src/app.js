@@ -24,7 +24,7 @@ const wishlistRoutes = require("./routes/wishlist.routes");
 const orderRoutes = require("./routes/order.routes");
 const couponRoutes = require("./routes/coupon.routes");
 const stripeWebhook = require("./routes/stripeWebhook.route");
-
+app.use("/api/stripe", stripeWebhook);
 // CORS
 app.use(cors());
 app.options("*", cors());
@@ -44,7 +44,6 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, please try again in an hour!",
 });
 app.use("/api", limiter);
-app.use("/webhook", stripeWebhook);
 // Body parser
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
