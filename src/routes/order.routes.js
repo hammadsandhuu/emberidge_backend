@@ -17,5 +17,6 @@ router.use(restrictTo("admin"));
 router.get("/admin/all", orderController.getAllOrders);
 router.patch("/admin/:id/status", orderController.updateOrderStatus);
 router.delete("/admin/:id", orderController.deleteOrder);
+router.put("/:id/status", protect, adminOnly, markOrderStatus);
 
 module.exports = router;

@@ -39,6 +39,7 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
 exports.createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
   const { addressId, paymentMethod = "COD", metadata = {} } = req.body;
+
   const user = await User.findById(userId).populate("addresses");
   if (!user) return errorResponse(res, "User not found", 404);
 
@@ -73,9 +74,8 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     for (const item of cart.items) {
       const p = await Product.findById(item.product._id).session(session);
       if (!p) throw new Error(`Product ${item.product._id} not found`);
-      if (!p.in_stock || p.quantity < item.quantity) {
+      if (!p.in_stock || p.quantity < item.quantity)
         throw new Error(`Insufficient stock for product ${p.name}`);
-      }
 
       const price = p.sale_price && p.on_sale ? p.sale_price : p.price;
       const productShippingFee = p.shippingFee || 0;
@@ -108,8 +108,6 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       items: orderItems,
       shippingAddress: shippingSnapshot,
       paymentMethod,
-      paymentStatus: paymentMethod === "stripe" ? "pending" : "unpaid",
-      orderStatus: "processing",
       subtotal,
       shippingFee,
       discount,
@@ -118,7 +116,16 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       metadata,
     };
 
+    if (paymentMethod === "stripe") {
+      orderData.paymentStatus = "pending";
+      orderData.orderStatus = "processing";
+    } else if (paymentMethod === "COD") {
+      orderData.paymentStatus = "unpaid";
+      orderData.orderStatus = "pending";
+    }
+
     let clientSecret = null;
+
     if (paymentMethod === "stripe") {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(totalAmount * 100),
@@ -149,9 +156,8 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     const [order] = await Order.create([orderData], { session });
 
-    if (coupon) {
-      await redeemCoupon(coupon, userId);
-    }
+    if (coupon) await redeemCoupon(coupon, userId);
+
     cart.items = [];
     cart.coupon = null;
     cart.discount = 0;
@@ -161,6 +167,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
+
     try {
       await sendEmail({
         email: user.email,
@@ -183,8 +190,13 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     return successResponse(
       res,
-      { order, clientSecret },
-      "Order created successfully",
+      {
+        order,
+        clientSecret: paymentMethod === "stripe" ? clientSecret : null,
+      },
+      paymentMethod === "COD"
+        ? "COD order created successfully"
+        : "Stripe order created successfully",
       201
     );
   } catch (err) {
@@ -321,4 +333,18 @@ exports.trackOrder = catchAsync(async (req, res, next) => {
   };
 
   return successResponse(res, { trackingInfo }, "Order tracking info fetched");
+});
+
+exports.markOrderStatus = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { paymentStatus, orderStatus } = req.body;
+
+  const order = await Order.findById(id);
+  if (!order) return errorResponse(res, "Order not found", 404);
+
+  if (paymentStatus) order.paymentStatus = paymentStatus;
+  if (orderStatus) order.orderStatus = orderStatus;
+  await order.save();
+
+  return successResponse(res, order, "Order updated successfully");
 });
