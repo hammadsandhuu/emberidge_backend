@@ -3,8 +3,7 @@ const router = express.Router();
 const Stripe = require("stripe");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const Order = require("../models/order.model");
-const { sendEmail } = require("../utils/sendEmail");
-const { orderConfirmationEmail } = require("../emails/orderConfirmationEmail");
+const sendEmail = require("../utils/email");
 
 /*
   ⚠️ IMPORTANT
