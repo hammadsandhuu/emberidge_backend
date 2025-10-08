@@ -3,7 +3,7 @@ const router = express.Router();
 const couponController = require("../controllers/coupon.controller");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 
-// Admin routes
+// ---------- Admin Routes ----------
 router.post("/", protect, restrictTo("admin"), couponController.createCoupon);
 router.put("/:id", protect, restrictTo("admin"), couponController.updateCoupon);
 router.delete(
@@ -13,8 +13,9 @@ router.delete(
   couponController.deleteCoupon
 );
 
-// Public routes
+// ---------- Public Routes ----------
 router.get("/", couponController.getCoupons);
 router.get("/:code", couponController.getCoupon);
+router.post("/validate", protect, couponController.validateCoupon); // Checkout validation
 
 module.exports = router;

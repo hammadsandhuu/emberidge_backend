@@ -22,12 +22,6 @@ const cartSchema = new mongoose.Schema(
       index: true,
     },
     items: [cartItemSchema],
-    coupon: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      default: null,
-    },
-    discount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     finalTotal: { type: Number, default: 0 },
   },

@@ -10,31 +10,26 @@ const couponSchema = new mongoose.Schema(
       uppercase: true,
     },
     description: { type: String, trim: true },
-
     discountType: {
       type: String,
       enum: ["percentage", "fixed"],
       required: true,
     },
     discountValue: { type: Number, required: true, min: 0 },
-
     minCartValue: { type: Number, default: 0 },
-    maxDiscount: { type: Number, default: null }, // only for percentage type
-    usageLimit: { type: Number, default: null }, // global limit
+    maxDiscount: { type: Number, default: null },
+    usageLimit: { type: Number, default: null },
     usedCount: { type: Number, default: 0 },
-
     perUserLimit: { type: Number, default: 1 },
-    userUsage: { type: Map, of: Number, default: {} }, // { userId: count }
-
+    userUsage: { type: Map, of: Number, default: {} },
     startDate: { type: Date, default: Date.now },
     expiryDate: { type: Date, default: null },
-
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
-// Virtual: isExpired
+// Virtual: Check if coupon is expired
 couponSchema.virtual("isExpired").get(function () {
   if (!this.expiryDate) return false;
   return this.expiryDate < new Date();

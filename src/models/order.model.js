@@ -30,8 +30,6 @@ const orderSchema = new mongoose.Schema(
     },
     items: [orderItemSchema],
     shippingAddress: addressSchema,
-
-    // ✅ New fields
     orderNumber: {
       type: String,
       unique: true,

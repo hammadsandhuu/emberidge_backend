@@ -11,8 +11,4 @@ router.patch("/update/:productId", cartController.updateCartItem);
 router.delete("/remove/:productId", cartController.removeFromCart);
 router.delete("/clear", cartController.clearCart);
 
-// Coupon routes (user)
-router.post("/apply-coupon", cartController.applyCoupon);
-router.delete("/remove-coupon", cartController.removeCoupon);
-
 module.exports = router;

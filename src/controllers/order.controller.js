@@ -14,7 +14,6 @@ const APIFeatures = require("../utils/apiFeatures");
 const orderConfirmationEmail = require("../templates/emails/orderConfirmationEmail");
 const sendEmail = require("../utils/email");
 
-// Get all orders (paginated)
 exports.getAllOrders = catchAsync(async (req, res, next) => {
   const total = await Order.countDocuments();
 
@@ -38,7 +37,12 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
 // Create Order
 exports.createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
-  const { addressId, paymentMethod = "COD", metadata = {} } = req.body;
+  const {
+    addressId,
+    paymentMethod = "COD",
+    metadata = {},
+    couponCode,
+  } = req.body;
 
   const user = await User.findById(userId).populate("addresses");
   if (!user) return errorResponse(res, "User not found", 404);
@@ -71,6 +75,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     let subtotal = 0;
     let shippingFee = 0;
 
+    // Build order items and deduct stock
     for (const item of cart.items) {
       const p = await Product.findById(item.product._id).session(session);
       if (!p) throw new Error(`Product ${item.product._id} not found`);
@@ -99,8 +104,21 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       }
     }
 
-    const discount = cart.discount || 0;
-    const coupon = cart.coupon || null;
+    // Validate coupon (if provided)
+    let discount = 0;
+    let coupon = null;
+    if (couponCode) {
+      const couponValidation = await validateCouponInternal(
+        couponCode,
+        subtotal,
+        userId
+      );
+      if (!couponValidation.valid)
+        return errorResponse(res, couponValidation.message, 400);
+      discount = couponValidation.discount;
+      coupon = couponValidation.coupon._id;
+    }
+
     const totalAmount = subtotal - discount + shippingFee;
 
     const orderData = {
@@ -114,18 +132,13 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       coupon,
       totalAmount,
       metadata,
+      paymentStatus: paymentMethod === "COD" ? "unpaid" : "pending",
+      orderStatus: paymentMethod === "COD" ? "pending" : "processing",
     };
-
-    if (paymentMethod === "stripe") {
-      orderData.paymentStatus = "pending";
-      orderData.orderStatus = "processing";
-    } else if (paymentMethod === "COD") {
-      orderData.paymentStatus = "unpaid";
-      orderData.orderStatus = "pending";
-    }
 
     let clientSecret = null;
 
+    // Stripe payment
     if (paymentMethod === "stripe") {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(totalAmount * 100),
@@ -154,10 +167,13 @@ exports.createOrder = catchAsync(async (req, res, next) => {
       clientSecret = paymentIntent.client_secret;
     }
 
+    // Create order
     const [order] = await Order.create([orderData], { session });
 
+    // Redeem coupon if applied
     if (coupon) await redeemCoupon(coupon, userId);
 
+    // Clear cart
     cart.items = [];
     cart.coupon = null;
     cart.discount = 0;
@@ -168,6 +184,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
+    // Send confirmation email
     try {
       await sendEmail({
         email: user.email,
@@ -190,10 +207,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
     return successResponse(
       res,
-      {
-        order,
-        clientSecret: paymentMethod === "stripe" ? clientSecret : null,
-      },
+      { order, clientSecret: paymentMethod === "stripe" ? clientSecret : null },
       paymentMethod === "COD"
         ? "COD order created successfully"
         : "Stripe order created successfully",
@@ -206,6 +220,7 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     return errorResponse(res, err.message || "Order creation failed", 400);
   }
 });
+
 
 //  Get user's all orders (paginated)
 exports.getOrders = catchAsync(async (req, res, next) => {
