@@ -53,6 +53,16 @@ const productSchema = new mongoose.Schema(
       { type: mongoose.Schema.Types.ObjectId, ref: "VariationOption" },
     ],
     shippingFee: { type: Number, min: 0, default: 0 },
+    // models/product.model.js (snippet — add these fields inside schema)
+    weight: { type: Number, min: 0, default: 0.5 }, // weight in KG, default 0.5kg
+    shippingClass: {
+      type: String,
+      enum: ["standard", "fragile", "oversized"],
+      default: "standard",
+    },
+    // keep existing shippingFee field as base handling/packaging fee
+    shippingFee: { type: Number, min: 0, default: 0 },
+
     in_stock: { type: Boolean, default: true, index: true },
     is_active: { type: Boolean, default: true, index: true },
     additional_info: { type: Map, of: String, default: {} },

@@ -14,5 +14,7 @@ router.delete("/clear", cartController.clearCart);
 // Coupon routes (user)
 router.post("/apply-coupon", cartController.applyCoupon);
 router.delete("/remove-coupon", cartController.removeCoupon);
+// Shipping method
+router.patch("/set-shipping-method", cartController.setShippingMethod);
 
 module.exports = router;

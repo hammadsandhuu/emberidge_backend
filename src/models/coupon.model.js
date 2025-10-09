@@ -12,10 +12,10 @@ const couponSchema = new mongoose.Schema(
     description: { type: String, trim: true },
     discountType: {
       type: String,
-      enum: ["percentage", "fixed"],
+      enum: ["percentage", "fixed", "free_shipping"],
       required: true,
     },
-    discountValue: { type: Number, required: true, min: 0 },
+    discountValue: { type: Number, default: 0 },
     minCartValue: { type: Number, default: 0 },
     maxDiscount: { type: Number, default: null },
     usageLimit: { type: Number, default: null },
@@ -29,10 +29,8 @@ const couponSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Virtual: Check if coupon is expired
 couponSchema.virtual("isExpired").get(function () {
-  if (!this.expiryDate) return false;
-  return this.expiryDate < new Date();
+  return this.expiryDate && this.expiryDate < new Date();
 });
 
 module.exports = mongoose.model("Coupon", couponSchema);

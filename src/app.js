@@ -23,7 +23,10 @@ const cartRoutes = require("./routes/cart.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
 const orderRoutes = require("./routes/order.routes");
 const couponRoutes = require("./routes/coupon.routes");
+const shippingZoneRoutes = require("./routes/shippingZone.routes");
+const siteSettingRoutes = require("./routes/siteSetting.routes");
 const stripeWebhook = require("./routes/stripeWebhook.route");
+
 app.use("/api/stripe", stripeWebhook);
 // CORS
 app.use(cors());
@@ -83,6 +86,8 @@ app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/wishlist", wishlistRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/coupon", couponRoutes);
+app.use("/api/v1/shipping-zones", shippingZoneRoutes);
+app.use("/api/v1/admin/settings", siteSettingRoutes);
 
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
