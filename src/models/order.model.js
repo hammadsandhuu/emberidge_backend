@@ -43,7 +43,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["COD", "stripe", "applepay"],
+      enum: ["cod", "stripe", "applepay"],
       default: "stripe",
     },
     paymentStatus: {
@@ -54,7 +54,7 @@ const orderSchema = new mongoose.Schema(
     paymentIntentId: { type: String, default: null },
     orderStatus: {
       type: String,
-      enum: ["processing", "shipped", "delivered", "cancelled"],
+      enum: ["processing", "pending", "shipped", "delivered", "cancelled"],
       default: "processing",
     },
     subtotal: { type: Number, required: true, default: 0 },
