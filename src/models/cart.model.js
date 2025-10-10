@@ -35,6 +35,13 @@ const cartSchema = new mongoose.Schema(
       enum: ["standard", "express"],
       default: "standard",
     },
+    codFee: { type: Number, default: 0 },
+    paymentMethod: {
+      type: String,
+      enum: ["stripe", "cod"],
+      default: "stripe",
+    },
+
     total: { type: Number, default: 0 },
     finalTotal: { type: Number, default: 0 },
   },

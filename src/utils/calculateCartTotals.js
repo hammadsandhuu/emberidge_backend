@@ -10,6 +10,7 @@ const {
   DEFAULT_FREE_SHIPPING_THRESHOLD,
   SHIPPING_CLASS_SURCHARGES,
 } = require("../../config/constants");
+const siteSettingModel = require("../models/siteSetting.model");
 
 const calculateCartTotals = async (cart, userId, userAddress = {}) => {
   // Fetch products
@@ -157,12 +158,27 @@ const calculateCartTotals = async (cart, userId, userAddress = {}) => {
     if (validCoupon?.discountType === "free_shipping") shippingFee = 0;
   }
 
+  // COD fee logic (Dynamic from Site Settings)
+  let codFee = 0;
+
+  if (cart.paymentMethod === "cod") {
+    try {
+      const codFeeSetting = await siteSettingModel.findOne({ key: "COD_FEE" });
+      codFee = codFeeSetting ? Number(codFeeSetting.value) || 0 : 0;
+    } catch (err) {
+      console.error("Error fetching COD_FEE from SiteSetting:", err);
+      codFee = 0; // fallback
+    }
+  } else {
+    codFee = 0;
+  }
+
   // Final totals
   cart.total = subtotal;
   cart.discount = discount;
   cart.shippingFee = shippingFee;
-  cart.finalTotal = Math.max(subtotal - discount + shippingFee, 0);
-
+  cart.codFee = codFee;
+  cart.finalTotal = Math.max(subtotal - discount + shippingFee + codFee, 0);
   cart._computed = { totalWeight };
 
   return cart;

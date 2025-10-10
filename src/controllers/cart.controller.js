@@ -37,6 +37,7 @@ exports.getCart = catchAsync(async (req, res) => {
     quantity: i.quantity,
     shippingFee: i.product.shippingFee,
     image: i.product.image,
+    slug: i.product.slug,
   }));
 
   return successResponse(
@@ -47,6 +48,7 @@ exports.getCart = catchAsync(async (req, res) => {
       discount: cart.discount,
       shippingFee: cart.shippingFee,
       finalTotal: cart.finalTotal,
+      codFee: cart.codFee,
       coupon: cart.coupon,
       shippingMethod: cart.shippingMethod,
     },
@@ -172,4 +174,31 @@ exports.setShippingMethod = catchAsync(async (req, res) => {
   await updateCartTotals(cart, req.user._id);
 
   return successResponse(res, { cart }, `Shipping method updated to ${method}`);
+});
+
+// Set payment method (Card / COD)
+exports.setPaymentMethod = catchAsync(async (req, res) => {
+  const { method } = req.body;
+  if (!["stripe", "cod"].includes(method))
+    return errorResponse(res, "Invalid payment method", 400);
+
+  const cart = await Cart.findOne({ user: req.user._id });
+  if (!cart) return errorResponse(res, "Cart not found", 404);
+
+  cart.paymentMethod = method;
+  await calculateCartTotals(cart, req.user._id);
+  await cart.save();
+
+  return successResponse(
+    res,
+    {
+      total: cart.total,
+      discount: cart.discount,
+      shippingFee: cart.shippingFee,
+      codFee: cart.codFee,
+      finalTotal: cart.finalTotal,
+      paymentMethod: cart.paymentMethod,
+    },
+    `Payment method set to ${method}`
+  );
 });

@@ -16,5 +16,6 @@ router.post("/apply-coupon", cartController.applyCoupon);
 router.delete("/remove-coupon", cartController.removeCoupon);
 // Shipping method
 router.patch("/set-shipping-method", cartController.setShippingMethod);
+router.patch("/set-payment-method", cartController.setPaymentMethod);
 
 module.exports = router;
