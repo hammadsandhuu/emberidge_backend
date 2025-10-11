@@ -215,10 +215,12 @@ exports.getOrders = catchAsync(async (req, res, next) => {
 
 //  Get single order (ensure owner or admin)
 exports.getOrder = catchAsync(async (req, res, next) => {
-  const order = await Order.findById(req.params.id).populate(
-    "items.product",
-    "name slug image"
-  );
+  const order = await Order.findById(req.params.id)
+    .populate("items.product", "name slug image")
+    .populate(
+      "coupon",
+      "code discountType discountValue minCartValue maxDiscount"
+    );
 
   if (!order) return errorResponse(res, "Order not found", 404);
 
