@@ -132,32 +132,96 @@ exports.clearCart = catchAsync(async (req, res) => {
   return successResponse(res, {}, "Cart cleared successfully");
 });
 
-//  Apply coupon
+// Apply Coupon (Improved Version)
 exports.applyCoupon = catchAsync(async (req, res) => {
   const { code } = req.body;
+  if (!code) return errorResponse(res, "Coupon code is required", 400);
+
+  // 1️⃣ Find coupon
   const coupon = await Coupon.findOne({
     code: code.toUpperCase(),
     isActive: true,
   });
+
   if (!coupon) return errorResponse(res, "Invalid coupon", 400);
   if (coupon.isExpired) return errorResponse(res, "Coupon expired", 400);
+  if (coupon.startDate && coupon.startDate > new Date())
+    return errorResponse(res, "Coupon not yet active", 400);
 
-  const cart = await Cart.findOne({ user: req.user._id });
+  // 2️⃣ Find user's cart
+  const cart = await Cart.findOne({ user: req.user._id }).populate(
+    "items.product"
+  );
   if (!cart) return errorResponse(res, "Cart not found", 404);
 
+  // 3️⃣ Calculate current subtotal
+  let subtotal = 0;
+  for (const item of cart.items) {
+    const product = item.product;
+    const price = product.sale_price ?? product.price ?? 0;
+    subtotal += price * item.quantity;
+  }
+
+  // 4️⃣ Check eligibility
+  if (subtotal < (coupon.minCartValue || 0))
+    return errorResponse(
+      res,
+      `Cart total must be at least ${coupon.minCartValue}`,
+      400
+    );
+
+  // 5️⃣ Check usage limits
+  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit)
+    return errorResponse(res, "Coupon usage limit reached", 400);
+
+  const userUsage = coupon.userUsage?.get(req.user._id.toString()) || 0;
+  if (coupon.perUserLimit && userUsage >= coupon.perUserLimit)
+    return errorResponse(res, "You have already used this coupon", 400);
+
+  // 6️⃣ Apply coupon to cart
   cart.coupon = coupon._id;
   await updateCartTotals(cart, req.user._id);
+
+  // 7️⃣ Update usage counts
+  coupon.usedCount += 1;
+  coupon.userUsage.set(req.user._id.toString(), userUsage + 1);
+  await coupon.save();
+
   return successResponse(res, { cart }, "Coupon applied successfully");
 });
 
-//  Remove coupon
+// Remove Coupon (Improved Version)
 exports.removeCoupon = catchAsync(async (req, res) => {
   const cart = await Cart.findOne({ user: req.user._id });
   if (!cart) return errorResponse(res, "Cart not found", 404);
 
+  if (!cart.coupon)
+    return errorResponse(res, "No coupon applied to this cart", 400);
+
+  // 1️⃣ Fetch the coupon document
+  const coupon = await Coupon.findById(cart.coupon);
+  if (coupon) {
+    // 2️⃣ Decrease global usage count safely
+    if (coupon.usedCount > 0) coupon.usedCount -= 1;
+
+    // 3️⃣ Decrease user's personal usage count
+    const userId = req.user._id.toString();
+    const userUsageCount = coupon.userUsage.get(userId) || 0;
+    if (userUsageCount > 0) {
+      coupon.userUsage.set(userId, userUsageCount - 1);
+    }
+
+    // 4️⃣ Save coupon updates
+    await coupon.save();
+  }
+
+  // 5️⃣ Clear coupon from cart
   cart.coupon = null;
   cart.discount = 0;
+
+  // 6️⃣ Recalculate totals
   await updateCartTotals(cart, req.user._id);
+
   return successResponse(res, { cart }, "Coupon removed successfully");
 });
 
