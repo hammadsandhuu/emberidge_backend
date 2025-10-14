@@ -15,6 +15,7 @@ const orderConfirmationEmail = require("../templates/emails/orderConfirmationEma
 const sendEmail = require("../utils/email");
 const calculateCartTotals = require("../utils/calculateCartTotals");
 
+// get All products
 exports.getAllOrders = catchAsync(async (req, res, next) => {
   const total = await Order.countDocuments();
 
@@ -79,10 +80,12 @@ exports.createOrder = catchAsync(async (req, res) => {
 
       if (product.product_type === "simple") {
         product.quantity -= item.quantity;
+        product.salesCount = (product.salesCount || 0) + item.quantity;
         if (product.quantity <= 0) product.in_stock = false;
         await product.save({ session });
       }
     }
+
     const orderItems = cart.items.map((item) => ({
       product: item.product._id,
       name: item.product.name,
@@ -276,18 +279,26 @@ exports.cancelOrder = catchAsync(async (req, res, next) => {
   order.orderStatus = "cancelled";
   await order.save();
 
-  // ✅ Optional: Restore stock after cancellation
+  // ✅ Restore stock and rollback sales count
   for (const item of order.items) {
     const product = await Product.findById(item.product._id);
     if (product && product.product_type === "simple") {
+      // 🔄 Restore stock
       product.quantity += item.quantity;
       product.in_stock = true;
+
+      // 🔄 Rollback salesCount
+      if (product.salesCount && product.salesCount > 0) {
+        product.salesCount = Math.max(0, product.salesCount - item.quantity);
+      }
+
       await product.save();
     }
   }
 
   return successResponse(res, { order }, "Order cancelled successfully");
 });
+
 
 // Admin: delete order
 exports.deleteOrder = catchAsync(async (req, res, next) => {

@@ -111,7 +111,6 @@ exports.getProduct = catchAsync(async (req, res, next) => {
   );
 });
 
-
 // ------------------ CREATE PRODUCT ------------------
 exports.createProduct = catchAsync(async (req, res, next) => {
   let productData = req.body;
@@ -787,8 +786,6 @@ exports.getBestSellerProducts = catchAsync(async (req, res, next) => {
   );
 });
 
-
-
 // ------------------ GET RELATED PRODUCTS ------------------
 exports.getRelatedProducts = catchAsync(async (req, res, next) => {
   const { slug } = req.params;
@@ -858,3 +855,89 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
     "Related products fetched successfully"
   );
 });
+
+// ------------------ GET TOP 10 SALES PRODUCTS ------------------
+exports.getTopSalesProducts = catchAsync(async (req, res, next) => {
+  // Base filter: only active & in-stock products
+  const baseFilter = { is_active: true, in_stock: true };
+
+  // Allow optional category or seller filters
+  if (req.query.categoryId) {
+    baseFilter.category = req.query.categoryId;
+  }
+  if (req.query.sellerId) {
+    baseFilter.seller = req.query.sellerId;
+  }
+
+  // 🔹 Step 1: Fetch top-selling products (salesCount > 0)
+  const salesFilter = { ...baseFilter, salesCount: { $gt: 0 } };
+
+  let products = await Product.find(salesFilter)
+    .sort({ salesCount: -1, ratingsAverage: -1 })
+    .limit(10)
+    .populate("tags", "name slug")
+    .populate("category", "name slug")
+    .populate("subCategory", "name slug")
+    .populate({
+      path: "variations",
+      populate: { path: "attribute", select: "slug name type values" },
+    })
+    .populate({
+      path: "variation_options",
+      populate: {
+        path: "attributes.attribute",
+        select: "slug name type values",
+      },
+    })
+    .populate("image gallery", "original thumbnail");
+
+  // 🔹 Step 2: If no sales data found, fallback to top-rated products
+  if (!products || products.length === 0) {
+    products = await Product.find(baseFilter)
+      .sort({ ratingsAverage: -1, ratingsQuantity: -1 })
+      .limit(10)
+      .populate("tags", "name slug")
+      .populate("category", "name slug")
+      .populate("subCategory", "name slug")
+      .populate({
+        path: "variations",
+        populate: { path: "attribute", select: "slug name type values" },
+      })
+      .populate({
+        path: "variation_options",
+        populate: {
+          path: "attributes.attribute",
+          select: "slug name type values",
+        },
+      })
+      .populate("image gallery", "original thumbnail");
+
+    if (!products || products.length === 0) {
+      return errorResponse(res, "No products available", 404);
+    }
+
+    const formattedTopRated = products.map((p) => ({
+      ...p.toObject(),
+      additional_info: formatAdditionalInfo(p.toObject()),
+    }));
+
+    return successResponse(
+      res,
+      { products: formattedTopRated },
+      "No sales yet — showing top-rated products"
+    );
+  }
+
+  // 🔹 Step 3: Return top-selling products
+  const formattedTopSales = products.map((p) => ({
+    ...p.toObject(),
+    additional_info: formatAdditionalInfo(p.toObject()),
+  }));
+
+  return successResponse(
+    res,
+    { products: formattedTopSales },
+    "Top 10 best-selling products fetched successfully"
+  );
+});
+

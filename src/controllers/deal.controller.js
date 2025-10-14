@@ -142,3 +142,74 @@ exports.getDeal = catchAsync(async (req, res, next) => {
 
   return successResponse(res, { deal }, "Deal fetched successfully");
 });
+
+// ------------------ GET TOP OFFERS (ACROSS ACTIVE DEALS) ------------------
+exports.getTopOffers = catchAsync(async (req, res, next) => {
+  const now = new Date();
+
+  // 1️⃣ Get active deals
+  const deals = await Deal.find({
+    isActive: true,
+    startDate: { $lte: now },
+    endDate: { $gte: now },
+  })
+    .populate({
+      path: "products",
+      select: "name slug price sale_price image category",
+      populate: [
+        { path: "image", select: "original thumbnail" },
+        { path: "category", select: "name slug" },
+      ],
+    })
+    .populate("categories", "name slug")
+    .sort({ priority: -1, createdAt: -1 });
+
+  if (!deals.length)
+    return errorResponse(res, "No active offers available", 404);
+
+  let offerProducts = [];
+
+  // 2️⃣ Process each deal and compute discount
+  for (const deal of deals) {
+    for (const p of deal.products || []) {
+      const originalPrice = p.price;
+      let discountedPrice = p.sale_price || p.price;
+
+      if (deal.discountType === "percentage") {
+        discountedPrice = originalPrice - (originalPrice * deal.discountValue) / 100;
+      } else if (deal.discountType === "fixed" || deal.discountType === "flat") {
+        discountedPrice = Math.max(originalPrice - deal.discountValue, 0);
+      }
+
+      const discountPercent = Math.round(
+        ((originalPrice - discountedPrice) / originalPrice) * 100
+      );
+
+      offerProducts.push({
+        productId: p._id,
+        name: p.name,
+        slug: p.slug,
+        image: p.image,
+        category: p.category,
+        originalPrice,
+        discountedPrice,
+        discountPercent,
+        dealTitle: deal.title,
+        dealId: deal._id,
+        dealPriority: deal.priority,
+      });
+    }
+  }
+
+  // 3️⃣ Sort by discount percentage (highest first)
+  offerProducts.sort((a, b) => b.discountPercent - a.discountPercent);
+
+  // 4️⃣ Limit to Top 10 (or use req.query.limit)
+  const topOffers = offerProducts.slice(0, Number(req.query.limit) || 10);
+
+  return successResponse(
+    res,
+    { offers: topOffers },
+    "Top offers fetched successfully"
+  );
+});

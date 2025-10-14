@@ -12,6 +12,7 @@ router.get("/categories", productController.getProductsByCategorySubCategories);
 router.get("/best-seller", productController.getBestSellerProducts);
 router.get("/new-arrival", productController.getNewSellerProducts);
 router.get("/on-sale", productController.getSaleProducts);
+router.get("/top-sales", productController.getTopSalesProducts);
 router.get("/:slug", productController.getProduct);
 router.get("/:slug/related", productController.getRelatedProducts);
 
