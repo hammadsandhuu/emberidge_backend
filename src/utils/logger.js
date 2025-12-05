@@ -37,9 +37,12 @@ const logger = createLogger({
 });
 
 // Handle uncaught exceptions
-process.on("uncaughtException", (error) => {
-  logger.error("Uncaught Exception:", error);
-  process.exit(1);
-});
+// In serverless, don't exit process - let Vercel handle it
+if (process.env.VERCEL !== "1") {
+  process.on("uncaughtException", (error) => {
+    logger.error("Uncaught Exception:", error);
+    process.exit(1);
+  });
+}
 
 module.exports = logger;
